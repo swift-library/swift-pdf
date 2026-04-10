@@ -1,0 +1,34 @@
+#if canImport(UIKit)
+  import PDFKit
+  import SwiftUI
+
+  @MainActor
+  extension PDFViewContainer {
+    func configurePageOverlayViewProvider(_ pdfView: PDFView, coordinator: Coordinator) {
+      pdfView.pageOverlayViewProvider = coordinator
+    }
+  }
+
+  @MainActor
+  extension PDFViewContainer.Coordinator: @preconcurrency PDFPageOverlayViewProvider {
+    public func pdfView(_ view: PDFView, overlayViewFor page: PDFPage) -> UIView? {
+      overlayHostRegistry.overlayView(for: page, contentProvider: overlayContent(for:))
+    }
+
+    public func pdfView(
+      _ pdfView: PDFView,
+      willDisplayOverlayView overlayView: UIView,
+      for page: PDFPage
+    ) {
+      overlayHostRegistry.willDisplayOverlayView(for: page, contentProvider: overlayContent(for:))
+    }
+
+    public func pdfView(
+      _ pdfView: PDFView,
+      willEndDisplayingOverlayView overlayView: UIView,
+      for page: PDFPage
+    ) {
+      overlayHostRegistry.didEndDisplayingOverlayView(for: page, release: releaseOverlay(for:))
+    }
+  }
+#endif
