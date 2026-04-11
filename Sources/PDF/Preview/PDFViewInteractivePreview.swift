@@ -86,10 +86,34 @@
     var body: some View {
       documentBody
         .safeAreaInset(edge: .top) {
-          topToolbar
+          PDFInteractivePreviewTopToolbar(
+            pageSummary: pageSummary,
+            overlaySummary: overlaySummary,
+            pageInput: $pageInput,
+            canGoToPreviousPage: canGoToPreviousPage,
+            canGoToNextPage: canGoToNextPage,
+            canJumpToPage: pageCount > 0,
+            isInMarkupMode: $isInMarkupMode,
+            overlayMode: $overlayMode,
+            showMarkupWarning: overlayMode != .off && !isInMarkupMode,
+            onFirst: goToFirstPage,
+            onPrevious: goToPreviousPage,
+            onNext: goToNextPage,
+            onLast: goToLastPage,
+            onJumpToPage: jumpToPageFromInput,
+            onResetOverlayTelemetry: overlayTelemetry.reset
+          )
         }
         .safeAreaInset(edge: .bottom) {
-          bottomToolbar
+          PDFInteractivePreviewBottomToolbar(
+            searchQuery: $searchQuery,
+            searchResultCount: searchResultCount,
+            searchSummary: searchSummary,
+            canClearSearch: !(searchResultCount == 0 && searchQuery.isEmpty),
+            onPreviousSearch: goToPreviousSearchResult,
+            onNextSearch: goToNextSearchResult,
+            onClearSearch: clearSearch
+          )
         }
         .onChange(of: pageIndex) { _, _ in
           if pageCount > 0 {
@@ -112,140 +136,22 @@
         .frame(height: 600)
     }
 
-    private var topToolbar: some View {
-      VStack(spacing: 8) {
-        HStack(spacing: 8) {
-          Button {
-            pageIndex = 0
-          } label: {
-            Label("First", systemImage: "backward.end.fill")
-          }
-          .disabled(!canGoToPreviousPage)
-
-          Button {
-            pageIndex = max(0, pageIndex - 1)
-          } label: {
-            Label("Prev", systemImage: "chevron.left")
-          }
-          .disabled(!canGoToPreviousPage)
-
-          Button {
-            pageIndex = min(max(pageCount - 1, 0), pageIndex + 1)
-          } label: {
-            Label("Next", systemImage: "chevron.right")
-          }
-          .disabled(!canGoToNextPage)
-
-          Button {
-            if pageCount > 0 {
-              pageIndex = pageCount - 1
-            }
-          } label: {
-            Label("Last", systemImage: "forward.end.fill")
-          }
-          .disabled(!canGoToNextPage)
-
-          Spacer()
-
-          TextField("Page", text: $pageInput)
-            .textFieldStyle(.roundedBorder)
-            .frame(width: 64)
-            .onSubmit {
-              jumpToPageFromInput()
-            }
-
-          Button("Go") {
-            jumpToPageFromInput()
-          }
-          .disabled(pageCount == 0)
-        }
-        .buttonStyle(.bordered)
-
-        HStack(spacing: 12) {
-          Text(pageSummary)
-            .font(.footnote.monospacedDigit())
-
-          Spacer()
-
-          Toggle("Markup", isOn: $isInMarkupMode)
-            .toggleStyle(.switch)
-            .fixedSize()
-
-          Picker("Overlay", selection: $overlayMode) {
-            ForEach(PreviewOverlayMode.allCases) { mode in
-              Text(mode.rawValue).tag(mode)
-            }
-          }
-          .pickerStyle(.segmented)
-          .frame(maxWidth: 260)
-
-          Button("Reset Overlay") {
-            overlayTelemetry.reset()
-          }
-        }
-        .font(.footnote)
-
-        HStack {
-          Text(overlaySummary)
-            .font(.caption.monospacedDigit())
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-            .minimumScaleFactor(0.85)
-
-          Spacer()
-        }
-
-        #if canImport(UIKit)
-          if overlayMode != .off && !isInMarkupMode {
-            HStack {
-              Text("Overlay requires Markup on iOS/visionOS.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-              Spacer()
-            }
-          }
-        #endif
-      }
-      .padding(.horizontal)
-      .padding(.top, 8)
-      .padding(.bottom, 10)
-      .background(.ultraThinMaterial)
+    private func goToFirstPage() {
+      pageIndex = 0
     }
 
-    private var bottomToolbar: some View {
-      VStack(spacing: 8) {
-        HStack(spacing: 8) {
-          TextField("Search in PDF", text: $searchQuery)
-            .textFieldStyle(.roundedBorder)
+    private func goToPreviousPage() {
+      pageIndex = max(0, pageIndex - 1)
+    }
 
-          Button("Prev") {
-            goToPreviousSearchResult()
-          }
-          .disabled(searchResultCount == 0)
+    private func goToNextPage() {
+      pageIndex = min(max(pageCount - 1, 0), pageIndex + 1)
+    }
 
-          Button("Next") {
-            goToNextSearchResult()
-          }
-          .disabled(searchResultCount == 0)
-
-          Button("Clear") {
-            searchQuery = ""
-            searchSelection = nil
-          }
-          .disabled(searchResultCount == 0 && searchQuery.isEmpty)
-        }
-        .buttonStyle(.bordered)
-
-        HStack {
-          Text(searchSummary)
-            .font(.footnote.monospacedDigit())
-            .foregroundStyle(.secondary)
-          Spacer()
-        }
+    private func goToLastPage() {
+      if pageCount > 0 {
+        pageIndex = pageCount - 1
       }
-      .padding(.horizontal)
-      .padding(.vertical, 10)
-      .background(.ultraThinMaterial)
     }
 
     private func jumpToPageFromInput() {
@@ -275,6 +181,11 @@
 
       let currentIndex = searchSelection ?? -1
       searchSelection = (currentIndex + 1) % searchResultCount
+    }
+
+    private func clearSearch() {
+      searchQuery = ""
+      searchSelection = nil
     }
 
     private func overlayKey(for page: PDFPage) -> String {
