@@ -1,6 +1,5 @@
-#if DEBUG && canImport(SwiftUI)
+#if DEBUG && canImport(SwiftUI) && PDF_INTERNAL_PREVIEW
   import Foundation
-  import PDF
   import PDFKit
   import SwiftUI
 
@@ -8,13 +7,13 @@
   private let requiredPreviewSource: PDFDocument.Representation = {
     guard let source = PreviewFixtures.previewSource() else {
       fatalError(
-        "Unable to create preview source. Expected fixture at repo root: \(PreviewFixtures.defaultRootPDFName)"
+        "Unable to create preview source. Expected fixture at repository path: \(PreviewFixtures.fixtureRelativePath)"
       )
     }
     return source
   }()
 
-  #Preview("Root Fixture PDF (Interactive)") {
+  #Preview("Fixture PDF (Interactive)") {
     PDFViewInteractivePreview(source: requiredPreviewSource)
   }
 #endif

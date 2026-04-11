@@ -1,4 +1,4 @@
-#if DEBUG && canImport(SwiftUI)
+#if DEBUG && canImport(SwiftUI) && PDF_INTERNAL_PREVIEW
   import Foundation
 
   enum PreviewOverlayMode: String, CaseIterable, Identifiable {

@@ -14,25 +14,20 @@ let package = Package(
     .library(
       name: "PDF",
       targets: ["PDF"]
-    ),
-    .library(
-      name: "PreviewSupport",
-      targets: ["PreviewSupport"]
     )
   ],
   targets: [
     .target(
       name: "PDF",
-      path: "Sources/PDF"
-    ),
-    .target(
-      name: "PreviewSupport",
-      dependencies: ["PDF"],
-      path: "Sources/PreviewSupport"
+      path: "Sources/PDF",
+      swiftSettings: [
+        .define("PDF_INTERNAL_PREVIEW", .when(configuration: .debug))
+      ]
     ),
     .testTarget(
       name: "PDFTests",
-      dependencies: ["PDF"]
+      dependencies: ["PDF"],
+      exclude: ["Fixtures/drawingwithquartz2d.pdf"]
     ),
   ]
 )

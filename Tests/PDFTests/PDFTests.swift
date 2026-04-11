@@ -1234,7 +1234,11 @@ private func fixturePDFURL() throws -> URL {
     .deletingLastPathComponent()
     .deletingLastPathComponent()
     .deletingLastPathComponent()
-  let fixtureURL = repositoryRoot.appendingPathComponent("drawingwithquartz2d.pdf")
+  let fixtureURL = repositoryRoot
+    .appendingPathComponent("Tests")
+    .appendingPathComponent("PDFTests")
+    .appendingPathComponent("Fixtures")
+    .appendingPathComponent("drawingwithquartz2d.pdf")
 
   guard FileManager.default.fileExists(atPath: fixtureURL.path) else {
     throw NSError(

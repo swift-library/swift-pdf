@@ -1,5 +1,4 @@
-#if DEBUG && canImport(SwiftUI)
-  import PDF
+#if DEBUG && canImport(SwiftUI) && PDF_INTERNAL_PREVIEW
   import PDFKit
   import SwiftUI
 

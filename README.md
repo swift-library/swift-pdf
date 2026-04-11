@@ -145,10 +145,12 @@ Detailed current API-to-PDFKit mapping is documented in
 
 ## Preview Fixture Policy
 
-- Root-level PDF fixtures (for example `drawingwithquartz2d.pdf`) are used only for local `#Preview`.
-- Preview implementation code lives in the dedicated `PreviewSupport` target/product, not in the `PDF` library target.
+- Preview implementation code lives under `Sources/PDF/Preview` and is compile-gated by `PDF_INTERNAL_PREVIEW`.
+- Shared preview/test fixture lives at `Tests/PDFTests/Fixtures/drawingwithquartz2d.pdf`.
 - Previews resolve fixture files from the repository file system path, not from `Bundle.module`.
 - `PDF` target does not declare `.process` / `.copy` resources for these files, so they are not packaged as SwiftPM target resources.
+- To enable previews locally, add `PDF_INTERNAL_PREVIEW` to Swift compiler conditions
+  (for example: `swift build -Xswiftc -DPDF_INTERNAL_PREVIEW`).
 
 ## Scope notes
 
