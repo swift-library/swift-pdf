@@ -13,7 +13,7 @@
     @State private var searchSelection: Int? = nil
     @State private var searchResultCount: Int = 0
     @State private var isInMarkupMode: Bool = true
-    @State private var overlayMode: PreviewOverlayMode = .interactive
+    @State private var overlayMode: PreviewOverlayMode = .off
 
     let source: PDFDocument.Representation
 
@@ -300,7 +300,7 @@
           .foregroundStyle(.white)
           .padding(.horizontal, 10)
           .padding(.vertical, 6)
-          .background(Color.blue.opacity(0.78))
+          .background(Color.black.opacity(0.78))
           .clipShape(RoundedRectangle(cornerRadius: 8))
           .padding(12)
           .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -310,7 +310,7 @@
           .foregroundStyle(.white)
           .padding(.horizontal, 10)
           .padding(.vertical, 7)
-          .background(Color.blue.opacity(0.78))
+          .background(Color.black.opacity(0.78))
           .clipShape(RoundedRectangle(cornerRadius: 8))
           .contentShape(RoundedRectangle(cornerRadius: 8))
           .onTapGesture {

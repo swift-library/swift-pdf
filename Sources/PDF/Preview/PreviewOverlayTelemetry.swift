@@ -11,11 +11,17 @@
     private(set) var lastTappedPage: String?
 
     func noteProvided(_ pageKey: String) {
+      guard !activePages.contains(pageKey) else {
+        return
+      }
       providedCount += 1
       activePages.insert(pageKey)
     }
 
     func noteReleased(_ pageKey: String) {
+      guard activePages.contains(pageKey) else {
+        return
+      }
       releasedCount += 1
       activePages.remove(pageKey)
     }

@@ -23,10 +23,8 @@
     static func previewSource(
       filePath: StaticString = #filePath
     ) -> PDFDocument.Representation? {
-      if let fixtureURL = fixtureURL(filePath: filePath),
-        let document = PDFDocument(url: fixtureURL)
-      {
-        return .document(document)
+      if let fixtureURL = fixtureURL(filePath: filePath) {
+        return .fileURL(fixtureURL)
       }
       return nil
     }
