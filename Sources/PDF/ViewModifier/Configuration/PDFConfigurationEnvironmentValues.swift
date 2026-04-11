@@ -3,9 +3,6 @@ import SwiftUI
 
 extension EnvironmentValues {
   @Entry
-  var viewConfiguration: PDFViewConfiguration = .default
-
-  @Entry
   var displayMode: PDFDisplayMode? = nil
 
   @Entry

@@ -3,16 +3,9 @@
   import SwiftUI
 
   @MainActor
-  extension PDFViewContainer {
-    func configurePageOverlayViewProvider(_ pdfView: PDFView, coordinator: Coordinator) {
-      pdfView.pageOverlayViewProvider = coordinator
-    }
-  }
-
-  @MainActor
   extension PDFViewContainer.Coordinator: @preconcurrency PDFPageOverlayViewProvider {
     public func pdfView(_ view: PDFView, overlayViewFor page: PDFPage) -> UIView? {
-      overlayHostRegistry.overlayView(for: page, contentProvider: overlayContent(for:))
+      overlayView(for: page)
     }
 
     public func pdfView(
@@ -20,7 +13,7 @@
       willDisplayOverlayView overlayView: UIView,
       for page: PDFPage
     ) {
-      overlayHostRegistry.willDisplayOverlayView(for: page, contentProvider: overlayContent(for:))
+      willDisplayOverlayView(for: page)
     }
 
     public func pdfView(
@@ -28,7 +21,7 @@
       willEndDisplayingOverlayView overlayView: UIView,
       for page: PDFPage
     ) {
-      overlayHostRegistry.didEndDisplayingOverlayView(for: page, release: releaseOverlay(for:))
+      didEndDisplayingOverlayView(for: page)
     }
   }
 #endif

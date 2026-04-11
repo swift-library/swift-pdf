@@ -3,10 +3,6 @@ import SwiftUI
 
 @MainActor
 extension PDFViewBase where Base: View {
-  public func configuration(_ configuration: PDFViewConfiguration) -> some View {
-    base.environment(\.viewConfiguration, configuration)
-  }
-
   public func displayMode(_ displayMode: PDFDisplayMode) -> some View {
     base.environment(\.displayMode, displayMode)
   }

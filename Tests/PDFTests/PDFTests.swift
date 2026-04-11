@@ -35,58 +35,33 @@ func documentSourceFileURLCaseBuildsReadableDocument() throws {
 }
 
 @Test
-func viewerConfigurationDefaultsMatchExpectedFoundationValues() {
-  let configuration = PDFViewConfiguration.default
+func viewerConfigurationDefaultsMatchSupportedModifierDefaults() {
+  let configuration = PDFViewConfiguration()
 
   #expect(configuration.displayMode == .singlePage)
   #expect(configuration.displayDirection == .horizontal)
+  #expect(configuration.autoScales == false)
   #expect(configuration.isInMarkupMode == false)
 }
 
 @Test
-func configurationBuilderSetsPDFViewOptionsInConfigurationValue() {
-  let margins = PDFPageMargins(top: 1, left: 2, bottom: 3, right: 4)
-
-  let configuration = PDFViewConfigurationBuilder.builder()
-    .displayMode(PDFDisplayMode.twoUpContinuous)
-    .displayDirection(PDFDisplayDirection.vertical)
-    .isInMarkupMode(true)
-    .autoScales(true)
-    .displaysAsBook(true)
-    .displaysPageBreaks(false)
-    .displaysRTL(true)
-    .minScaleFactor(0.5)
-    .maxScaleFactor(4.0)
-    .pageBreakMargins(margins)
-    .pageShadowsEnabled(false)
-    .build()
+func configurationMergeInitializesEffectiveConfigurationFromModifierInputs() {
+  let configuration = PDFViewConfiguration(
+    displayMode: .twoUpContinuous,
+    displayDirection: .vertical,
+    autoScales: true,
+    isInMarkupMode: true
+  )
 
   #expect(configuration.displayMode == PDFDisplayMode.twoUpContinuous)
   #expect(configuration.displayDirection == PDFDisplayDirection.vertical)
-  #expect(configuration.isInMarkupMode == true)
   #expect(configuration.autoScales == true)
-  #expect(configuration.displaysAsBook == true)
-  #expect(configuration.displaysPageBreaks == false)
-  #expect(configuration.displaysRTL == true)
-  #expect(configuration.minScaleFactor == 0.5)
-  #expect(configuration.maxScaleFactor == 4.0)
-  #expect(configuration.pageBreakMargins == margins)
-  #expect(configuration.pageShadowsEnabled == false)
+  #expect(configuration.isInMarkupMode == true)
 }
 
 @Test
-func configurationAndDisplayModifiersResolveWithoutOrderSensitivity() {
-  let baseConfiguration = PDFViewConfigurationBuilder.builder()
-    .displayMode(.singlePage)
-    .displayDirection(.horizontal)
-    .isInMarkupMode(false)
-    .autoScales(true)
-    .build()
-
-  let resolver = PDFViewConfigurationResolver()
-
+func configurationModifiersResolveWithoutOrderSensitivity() {
   var configurationFirstEnvironment = EnvironmentValues()
-  configurationFirstEnvironment.viewConfiguration = baseConfiguration
   configurationFirstEnvironment.displayMode = .twoUpContinuous
   configurationFirstEnvironment.displayDirection = .vertical
   configurationFirstEnvironment.autoScales = false
@@ -97,18 +72,15 @@ func configurationAndDisplayModifiersResolveWithoutOrderSensitivity() {
   modifiersFirstEnvironment.displayDirection = .vertical
   modifiersFirstEnvironment.autoScales = false
   modifiersFirstEnvironment.isInMarkupMode = true
-  modifiersFirstEnvironment.viewConfiguration = baseConfiguration
 
-  let configurationFirstResolved = resolver.resolve(
-    base: configurationFirstEnvironment.viewConfiguration,
+  let configurationFirstResolved = PDFViewConfiguration(
     displayMode: configurationFirstEnvironment.displayMode,
     displayDirection: configurationFirstEnvironment.displayDirection,
     autoScales: configurationFirstEnvironment.autoScales,
     isInMarkupMode: configurationFirstEnvironment.isInMarkupMode
   )
 
-  let modifiersFirstResolved = resolver.resolve(
-    base: modifiersFirstEnvironment.viewConfiguration,
+  let modifiersFirstResolved = PDFViewConfiguration(
     displayMode: modifiersFirstEnvironment.displayMode,
     displayDirection: modifiersFirstEnvironment.displayDirection,
     autoScales: modifiersFirstEnvironment.autoScales,
@@ -128,6 +100,25 @@ func configurationAndDisplayModifiersResolveWithoutOrderSensitivity() {
 
 @Test
 @MainActor
+func configureUsingAppliesResolvedConfigurationToPDFView() {
+  let pdfView = PDFView()
+  let configuration = PDFViewConfiguration(
+    displayMode: .twoUpContinuous,
+    displayDirection: .vertical,
+    autoScales: true,
+    isInMarkupMode: true
+  )
+
+  pdfView.configure(using: configuration)
+
+  #expect(pdfView.displayMode == .twoUpContinuous)
+  #expect(pdfView.displayDirection == .vertical)
+  #expect(pdfView.autoScales == true)
+  #expect(pdfView.isInMarkupMode == true)
+}
+
+@Test
+@MainActor
 func pageBindingDrivesNavigationAndClampsOutOfRangeValues() throws {
   let document = try #require(PDFDocument(url: fixturePDFURL()))
   #expect(document.pageCount > 0)
@@ -138,7 +129,7 @@ func pageBindingDrivesNavigationAndClampsOutOfRangeValues() throws {
   let pageIndexBox = IntBindingBox(0)
   let pageCountBox = IntBindingBox(0)
 
-  coordinator.bind(
+  bindCoordinator(coordinator,
     pdfView: pdfView,
     initialSource: .document(document),
     pageIndexBinding: makeBinding(for: pageIndexBox),
@@ -150,7 +141,7 @@ func pageBindingDrivesNavigationAndClampsOutOfRangeValues() throws {
   #expect(pageIndexBox.value == 0)
 
   pageIndexBox.value = document.pageCount + 99
-  coordinator.bind(
+  bindCoordinator(coordinator,
     pdfView: pdfView,
     initialSource: .document(document),
     pageIndexBinding: makeBinding(for: pageIndexBox),
@@ -162,7 +153,7 @@ func pageBindingDrivesNavigationAndClampsOutOfRangeValues() throws {
   #expect(currentPageIndex(in: pdfView) == lastPageIndex)
 
   pageIndexBox.value = -123
-  coordinator.bind(
+  bindCoordinator(coordinator,
     pdfView: pdfView,
     initialSource: .document(document),
     pageIndexBinding: makeBinding(for: pageIndexBox),
@@ -185,7 +176,7 @@ func internalPageChangesPublishBackIntoPageBinding() throws {
   let pageIndexBox = IntBindingBox(0)
   let pageCountBox = IntBindingBox(0)
 
-  coordinator.bind(
+  bindCoordinator(coordinator,
     pdfView: pdfView,
     initialSource: .document(document),
     pageIndexBinding: makeBinding(for: pageIndexBox),
@@ -196,7 +187,7 @@ func internalPageChangesPublishBackIntoPageBinding() throws {
   #expect(pageCountBox.value == document.pageCount)
 
   pdfView.goToNextPage(nil)
-  coordinator.bind(
+  bindCoordinator(coordinator,
     pdfView: pdfView,
     initialSource: .document(document),
     pageIndexBinding: makeBinding(for: pageIndexBox),
@@ -204,6 +195,110 @@ func internalPageChangesPublishBackIntoPageBinding() throws {
   )
 
   #expect(pageIndexBox.value == 1)
+}
+
+@Test
+@MainActor
+func rebindingInstallsObserverTokensOnlyWhenViewChanges() throws {
+  let document = try #require(PDFDocument(url: fixturePDFURL()))
+  #expect(document.pageCount > 0)
+
+  let coordinator = PDFViewContainer.Coordinator()
+  let firstView = PDFView()
+  let secondView = PDFView()
+
+  let pageIndexBox = IntBindingBox(0)
+  let pageCountBox = IntBindingBox(0)
+
+  bindCoordinator(coordinator,
+    pdfView: firstView,
+    initialSource: .document(document),
+    pageIndexBinding: makeBinding(for: pageIndexBox),
+    pageCountBinding: makeBinding(for: pageCountBox)
+  )
+  let initialPageObserver = try #require(
+    observerTokenIdentity(in: coordinator, field: "pageChangedObserver")
+  )
+  let initialScaleObserver = try #require(
+    observerTokenIdentity(in: coordinator, field: "scaleChangedObserver")
+  )
+
+  bindCoordinator(coordinator,
+    pdfView: firstView,
+    initialSource: .document(document),
+    pageIndexBinding: makeBinding(for: pageIndexBox),
+    pageCountBinding: makeBinding(for: pageCountBox)
+  )
+  let sameViewPageObserver = try #require(
+    observerTokenIdentity(in: coordinator, field: "pageChangedObserver")
+  )
+  let sameViewScaleObserver = try #require(
+    observerTokenIdentity(in: coordinator, field: "scaleChangedObserver")
+  )
+  #expect(sameViewPageObserver == initialPageObserver)
+  #expect(sameViewScaleObserver == initialScaleObserver)
+
+  bindCoordinator(coordinator,
+    pdfView: secondView,
+    initialSource: .document(document),
+    pageIndexBinding: makeBinding(for: pageIndexBox),
+    pageCountBinding: makeBinding(for: pageCountBox)
+  )
+  let changedViewPageObserver = try #require(
+    observerTokenIdentity(in: coordinator, field: "pageChangedObserver")
+  )
+  let changedViewScaleObserver = try #require(
+    observerTokenIdentity(in: coordinator, field: "scaleChangedObserver")
+  )
+  #expect(changedViewPageObserver != initialPageObserver)
+  #expect(changedViewScaleObserver != initialScaleObserver)
+
+  coordinator.detach()
+  #expect(observerTokenIdentity(in: coordinator, field: "pageChangedObserver") == nil)
+  #expect(observerTokenIdentity(in: coordinator, field: "scaleChangedObserver") == nil)
+}
+
+@Test
+@MainActor
+func detachStopsBindingPublicationsForPageAndSearch() throws {
+  let document = try #require(PDFDocument(url: fixturePDFURL()))
+  #expect(document.pageCount > 0)
+
+  let coordinator = PDFViewContainer.Coordinator()
+  let pdfView = PDFView()
+
+  let pageIndexBox = IntBindingBox(0)
+  let pageCountBox = IntBindingBox(0)
+  let queryBox = StringBindingBox("the")
+  let selectionBox = OptionalIntBindingBox(nil)
+  let resultCountBox = IntBindingBox(0)
+
+  bindCoordinator(coordinator,
+    pdfView: pdfView,
+    initialSource: .document(document),
+    pageIndexBinding: makeBinding(for: pageIndexBox),
+    pageCountBinding: makeBinding(for: pageCountBox),
+    searchQueryBinding: makeBinding(for: queryBox),
+    searchSelectionBinding: makeBinding(for: selectionBox),
+    searchResultCountBinding: makeBinding(for: resultCountBox)
+  )
+  #expect(pageCountBox.value == document.pageCount)
+  #expect(resultCountBox.value > 0)
+
+  coordinator.detach()
+
+  let pageIndexSnapshot = pageIndexBox.value
+  let pageCountSnapshot = pageCountBox.value
+  let selectionSnapshot = selectionBox.value
+  let resultCountSnapshot = resultCountBox.value
+
+  coordinator.loadDocumentIfNeeded(.document(PDFDocument()))
+  coordinator.loadDocumentIfNeeded(.data(Data()))
+
+  #expect(pageIndexBox.value == pageIndexSnapshot)
+  #expect(pageCountBox.value == pageCountSnapshot)
+  #expect(selectionBox.value == selectionSnapshot)
+  #expect(resultCountBox.value == resultCountSnapshot)
 }
 
 @Test
@@ -221,7 +316,7 @@ func searchBindingsPublishMatchesAndSupportSelectionControl() throws {
   let optionsBox = SearchOptionsBindingBox(.default)
   let resultsBox = SearchResultsBindingBox([])
 
-  coordinator.bind(
+  bindCoordinator(coordinator,
     pdfView: pdfView,
     initialSource: .document(document),
     pageIndexBinding: nil,
@@ -240,7 +335,7 @@ func searchBindingsPublishMatchesAndSupportSelectionControl() throws {
   }
 
   selectionBox.value = resultCountBox.value + 99
-  coordinator.bind(
+  bindCoordinator(coordinator,
     pdfView: pdfView,
     initialSource: .document(document),
     pageIndexBinding: nil,
@@ -271,7 +366,7 @@ func searchOptionsChangesTriggerRecomputationWithoutChangingQuery() throws {
   let optionsBox = SearchOptionsBindingBox(.default)
   let resultsBox = SearchResultsBindingBox([])
 
-  coordinator.bind(
+  bindCoordinator(coordinator,
     pdfView: pdfView,
     initialSource: .document(document),
     pageIndexBinding: nil,
@@ -287,7 +382,7 @@ func searchOptionsChangesTriggerRecomputationWithoutChangingQuery() throws {
   #expect(resultsBox.value.count == resultCountBox.value)
 
   optionsBox.value = PDFSearchOptions(caseInsensitive: false)
-  coordinator.bind(
+  bindCoordinator(coordinator,
     pdfView: pdfView,
     initialSource: .document(document),
     pageIndexBinding: nil,
@@ -318,7 +413,7 @@ func clearingSearchQueryResetsSearchBindings() throws {
   let optionsBox = SearchOptionsBindingBox(.default)
   let resultsBox = SearchResultsBindingBox([])
 
-  coordinator.bind(
+  bindCoordinator(coordinator,
     pdfView: pdfView,
     initialSource: .document(document),
     pageIndexBinding: nil,
@@ -330,7 +425,7 @@ func clearingSearchQueryResetsSearchBindings() throws {
     searchResultsBinding: makeBinding(for: resultsBox)
   )
   queryBox.value = ""
-  coordinator.bind(
+  bindCoordinator(coordinator,
     pdfView: pdfView,
     initialSource: .document(document),
     pageIndexBinding: nil,
@@ -361,7 +456,7 @@ func switchingDocumentRefreshesSearchBindingsAgainstNewDocument() throws {
   let optionsBox = SearchOptionsBindingBox(.default)
   let resultsBox = SearchResultsBindingBox([])
 
-  coordinator.bind(
+  bindCoordinator(coordinator,
     pdfView: pdfView,
     initialSource: .document(populatedDocument),
     pageIndexBinding: nil,
@@ -398,7 +493,7 @@ func pageChangesDoNotResetSearchBindings() throws {
   let selectionBox = OptionalIntBindingBox(nil)
   let resultCountBox = IntBindingBox(0)
 
-  coordinator.bind(
+  bindCoordinator(coordinator,
     pdfView: pdfView,
     initialSource: .document(document),
     pageIndexBinding: makeBinding(for: pageIndexBox),
@@ -412,7 +507,7 @@ func pageChangesDoNotResetSearchBindings() throws {
   #expect(initialResultCount > 0)
 
   pageIndexBox.value = 1
-  coordinator.bind(
+  bindCoordinator(coordinator,
     pdfView: pdfView,
     initialSource: .document(document),
     pageIndexBinding: makeBinding(for: pageIndexBox),
@@ -439,7 +534,7 @@ func repeatedLoadWithSameDocumentDoesNotThrashSearchBindings() throws {
   let selectionBox = OptionalIntBindingBox(nil)
   let resultCountBox = IntBindingBox(0)
 
-  coordinator.bind(
+  bindCoordinator(coordinator,
     pdfView: pdfView,
     initialSource: .document(document),
     pageIndexBinding: nil,
@@ -472,7 +567,7 @@ func previewStyleBindAndLoadCyclePublishesSearchBindings() throws {
   let selectionBox = OptionalIntBindingBox(nil)
   let resultCountBox = IntBindingBox(0)
 
-  coordinator.bind(
+  bindCoordinator(coordinator,
     pdfView: pdfView,
     initialSource: .document(document),
     pageIndexBinding: nil,
@@ -482,7 +577,7 @@ func previewStyleBindAndLoadCyclePublishesSearchBindings() throws {
     searchResultCountBinding: makeBinding(for: resultCountBox)
   )
   queryBox.value = "Quartz"
-  coordinator.bind(
+  bindCoordinator(coordinator,
     pdfView: pdfView,
     initialSource: .document(document),
     pageIndexBinding: nil,
@@ -511,7 +606,7 @@ func switchingToEmptyDocumentResetsPageCountAndPageIndexBindings() throws {
   let pageIndexBox = IntBindingBox(populatedDocument.pageCount + 10)
   let pageCountBox = IntBindingBox(0)
 
-  coordinator.bind(
+  bindCoordinator(coordinator,
     pdfView: pdfView,
     initialSource: .document(populatedDocument),
     pageIndexBinding: makeBinding(for: pageIndexBox),
@@ -643,11 +738,7 @@ func primaryViewAndModifierSurfaceCompiles() {
         .pdf.displayMode(.twoUpContinuous)
         .pdf.displayDirection(.vertical)
         .pdf.isInMarkupMode(true)
-        .pdf.configuration(
-          PDFViewConfigurationBuilder.builder()
-            .autoScales(true)
-            .build()
-        )
+        .pdf.autoScales(true)
         .pdf.page($pageIndex)
         .pdf.pageCount($pageCount)
         .pdf.searchQuery($searchQuery)
@@ -712,6 +803,36 @@ func pdfNamespaceModifierSurfaceCompiles() {
   }
 
   _ = NamespaceSurfaceView().body
+}
+
+@MainActor
+private func bindCoordinator(
+  _ coordinator: PDFViewContainer.Coordinator,
+  pdfView: PDFView,
+  initialSource: PDFDocumentSource,
+  pageIndexBinding: Binding<Int>?,
+  pageCountBinding: Binding<Int>?,
+  searchQueryBinding: Binding<String>? = nil,
+  searchSelectionBinding: Binding<Int?>? = nil,
+  searchResultCountBinding: Binding<Int>? = nil,
+  searchOptionsBinding: Binding<PDFSearchOptions>? = nil,
+  searchResultsBinding: Binding<[PDFSearchHit]>? = nil
+) {
+  coordinator.bind(
+    pdfView: pdfView,
+    initialSource: initialSource,
+    pageBindings: PDFPageBindings(
+      pageIndex: pageIndexBinding,
+      pageCount: pageCountBinding
+    ),
+    searchBindings: PDFSearchBindings(
+      query: searchQueryBinding,
+      selection: searchSelectionBinding,
+      resultCount: searchResultCountBinding,
+      options: searchOptionsBinding,
+      results: searchResultsBinding
+    )
+  )
 }
 
 @MainActor
@@ -806,6 +927,32 @@ private func currentPageIndex(in pdfView: PDFView) -> Int {
   }
 
   return max(0, document.index(for: currentPage))
+}
+
+@MainActor
+private func observerTokenIdentity(
+  in coordinator: PDFViewContainer.Coordinator,
+  field: String
+) -> ObjectIdentifier? {
+  let mirror = Mirror(reflecting: coordinator)
+  for child in mirror.children where child.label == field {
+    guard let unwrapped = unwrapOptional(child.value) else {
+      return nil
+    }
+
+    let object = unwrapped as AnyObject
+    return ObjectIdentifier(object)
+  }
+
+  return nil
+}
+
+private func unwrapOptional(_ value: Any) -> Any? {
+  let mirror = Mirror(reflecting: value)
+  guard mirror.displayStyle == .optional else {
+    return value
+  }
+  return mirror.children.first?.value
 }
 
 private func fixturePDFURL() throws -> URL {

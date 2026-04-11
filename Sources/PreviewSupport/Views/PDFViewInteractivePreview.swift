@@ -59,14 +59,10 @@
     @ViewBuilder
     private var documentBody: some View {
       let base = PDF(source: source)
-        .pdf.configuration(
-          PDFViewConfigurationBuilder.builder()
-            .displayMode(.singlePageContinuous)
-            .displayDirection(.vertical)
-            .isInMarkupMode(isInMarkupMode)
-            .autoScales(true)
-            .build()
-        )
+        .pdf.displayMode(.singlePageContinuous)
+        .pdf.displayDirection(.vertical)
+        .pdf.isInMarkupMode(isInMarkupMode)
+        .pdf.autoScales(true)
         .pdf.page($pageIndex)
         .pdf.pageCount($pageCount)
         .pdf.searchQuery($searchQuery)
