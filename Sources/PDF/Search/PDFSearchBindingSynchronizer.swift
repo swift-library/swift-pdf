@@ -1,3 +1,4 @@
+import Foundation
 import PDFKit
 import SwiftUI
 
@@ -17,21 +18,24 @@ final class PDFSearchBindingSynchronizer {
     queryBinding: Binding<String>?,
     selectionBinding: Binding<Int?>?,
     resultCountBinding: Binding<Int>?,
-    optionsBinding: Binding<PDFSearchOptions>?,
-    resultsBinding: Binding<[PDFSearchHit]>?
+    optionsBinding: Binding<NSString.CompareOptions>?,
+    resultsBinding: Binding<[PDFSearchHit]>?,
+    navigateToSearchMatch: @MainActor (PDFSearchRuntime.FocusTarget?) -> Void
   ) {
     let query = runtime.normalizedQuery(from: queryBinding?.wrappedValue)
-    let options = optionsBinding?.wrappedValue ?? .default
-    let didRefresh = runtime.refreshIfNeeded(on: pdfView, query: query, options: options)
+    let options = optionsBinding?.wrappedValue ?? []
+    let refreshResult = runtime.refreshIfNeeded(on: pdfView, query: query, options: options)
 
-    if didRefresh {
+    if refreshResult.didRefresh {
       lastAppliedExternalSelection = nil
       lastPublishedSelection = nil
+      navigateToSearchMatch(refreshResult.navigationTarget)
     } else {
       applyExternalSelectionIfNeeded(
         on: pdfView,
         runtime: runtime,
-        selectionBinding: selectionBinding
+        selectionBinding: selectionBinding,
+        navigateToSearchMatch: navigateToSearchMatch
       )
     }
 
@@ -46,7 +50,8 @@ final class PDFSearchBindingSynchronizer {
   private func applyExternalSelectionIfNeeded(
     on pdfView: PDFView?,
     runtime: PDFSearchRuntime,
-    selectionBinding: Binding<Int?>?
+    selectionBinding: Binding<Int?>?,
+    navigateToSearchMatch: @MainActor (PDFSearchRuntime.FocusTarget?) -> Void
   ) {
     guard let selectionBinding else {
       return
@@ -65,8 +70,9 @@ final class PDFSearchBindingSynchronizer {
         return
       }
 
-      let focused = runtime.focusFirstResultIfNeeded(on: pdfView)
-      lastAppliedExternalSelection = focused
+      let target = runtime.focusFirstResultIfNeeded(on: pdfView)
+      navigateToSearchMatch(target)
+      lastAppliedExternalSelection = runtime.snapshot.currentSelectionIndex
       return
     }
 
@@ -89,8 +95,9 @@ final class PDFSearchBindingSynchronizer {
       return
     }
 
-    let focused = runtime.focusSelection(at: clampedSelection, on: pdfView)
-    lastAppliedExternalSelection = focused
+    let target = runtime.focusSelection(at: clampedSelection, on: pdfView)
+    navigateToSearchMatch(target)
+    lastAppliedExternalSelection = runtime.snapshot.currentSelectionIndex
   }
 
   private func publish(

@@ -1,8 +1,20 @@
 import PDFKit
+import CoreGraphics
 import Foundation
 
 @MainActor
 final class PDFSearchRuntime {
+  struct FocusTarget {
+    let selection: PDFSelection
+    let page: PDFPage?
+    let bounds: CGRect
+  }
+
+  struct RefreshResult {
+    let didRefresh: Bool
+    let navigationTarget: FocusTarget?
+  }
+
   struct Snapshot {
     let currentSelectionIndex: Int?
     let resultCount: Int
@@ -10,7 +22,7 @@ final class PDFSearchRuntime {
   }
 
   private var activeQuery: String = ""
-  private var activeOptions: PDFSearchOptions = .default
+  private var activeOptions: NSString.CompareOptions = []
 
   private var searchSelections: [PDFSelection] = []
   private var searchHits: [PDFSearchHit] = []
@@ -20,7 +32,7 @@ final class PDFSearchRuntime {
 
   func reset() {
     activeQuery = ""
-    activeOptions = .default
+    activeOptions = []
     searchSelections.removeAll(keepingCapacity: false)
     searchHits.removeAll(keepingCapacity: false)
     currentSelectionIndex = nil
@@ -43,10 +55,14 @@ final class PDFSearchRuntime {
     (rawQuery ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
-  func refreshIfNeeded(on pdfView: PDFView?, query: String, options: PDFSearchOptions) -> Bool {
+  func refreshIfNeeded(
+    on pdfView: PDFView?,
+    query: String,
+    options: NSString.CompareOptions
+  ) -> RefreshResult {
     let shouldRefresh = query != activeQuery || options != activeOptions || shouldRefreshForDocumentChange
     guard shouldRefresh else {
-      return false
+      return RefreshResult(didRefresh: false, navigationTarget: nil)
     }
 
     shouldRefreshForDocumentChange = false
@@ -58,23 +74,25 @@ final class PDFSearchRuntime {
 
     guard !query.isEmpty else {
       pdfView?.setCurrentSelection(nil, animate: false)
-      return true
+      return RefreshResult(didRefresh: true, navigationTarget: nil)
     }
 
     guard let pdfView, let document = pdfView.document, document.pageCount > 0 else {
-      return true
+      return RefreshResult(didRefresh: true, navigationTarget: nil)
     }
 
-    searchSelections = document.findString(query, withOptions: options.compareOptions)
+    searchSelections = document.findString(query, withOptions: options)
     searchHits = makeHits(from: searchSelections)
 
     guard !searchSelections.isEmpty else {
       pdfView.setCurrentSelection(nil, animate: false)
-      return true
+      return RefreshResult(didRefresh: true, navigationTarget: nil)
     }
 
-    _ = focusSelection(at: 0, on: pdfView)
-    return true
+    return RefreshResult(
+      didRefresh: true,
+      navigationTarget: focusSelection(at: 0, on: pdfView)
+    )
   }
 
   func clampedSelection(_ requestedSelection: Int) -> Int? {
@@ -85,37 +103,27 @@ final class PDFSearchRuntime {
     return min(max(requestedSelection, 0), searchSelections.count - 1)
   }
 
-  func focusFirstResultIfNeeded(on pdfView: PDFView?) -> Int? {
+  func focusFirstResultIfNeeded(on pdfView: PDFView?) -> FocusTarget? {
     guard currentSelectionIndex == nil else {
-      return currentSelectionIndex
+      return nil
     }
 
     return focusSelection(at: 0, on: pdfView)
   }
 
-  func focusSelection(at index: Int, on pdfView: PDFView?) -> Int? {
+  func focusSelection(at index: Int, on pdfView: PDFView?) -> FocusTarget? {
     guard let pdfView else {
-      return currentSelectionIndex
+      return nil
     }
 
     guard searchSelections.indices.contains(index) else {
-      return currentSelectionIndex
+      return nil
     }
 
     currentSelectionIndex = index
     let selection = searchSelections[index]
     pdfView.setCurrentSelection(selection, animate: true)
-
-    if let page = selection.pages.first {
-      let bounds = selection.bounds(for: page)
-      if !bounds.isNull && !bounds.isEmpty {
-        pdfView.go(to: bounds, on: page)
-        return index
-      }
-    }
-
-    pdfView.go(to: selection)
-    return index
+    return makeFocusTarget(for: selection)
   }
 
   private func makeHits(from selections: [PDFSelection]) -> [PDFSearchHit] {
@@ -133,5 +141,17 @@ final class PDFSearchRuntime {
         text: selection.string ?? ""
       )
     }
+  }
+
+  private func makeFocusTarget(for selection: PDFSelection) -> FocusTarget {
+    guard let page = selection.pages.first else {
+      return FocusTarget(selection: selection, page: nil, bounds: .null)
+    }
+
+    return FocusTarget(
+      selection: selection,
+      page: page,
+      bounds: selection.bounds(for: page)
+    )
   }
 }

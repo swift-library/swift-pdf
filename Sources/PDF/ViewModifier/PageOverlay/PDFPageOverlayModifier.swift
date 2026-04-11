@@ -3,7 +3,7 @@ import SwiftUI
 
 @MainActor
 extension PDFViewBase where Base: View {
-  public func overlay(_ provider: @escaping PDFPageOverlayContentProvider) -> some View {
+  public func overlay(_ provider: @escaping PDFPageOverlayViewContentProvider) -> some View {
     base.environment(\.pageOverlayContentProvider, provider)
   }
 
@@ -15,7 +15,7 @@ extension PDFViewBase where Base: View {
     }
   }
 
-  public func overlayRelease(_ release: @escaping PDFPageOverlayRelease) -> some View {
+  public func overlayRelease(_ release: @escaping PDFPageOverlayViewRelease) -> some View {
     base.environment(\.pageOverlayRelease, release)
   }
 }

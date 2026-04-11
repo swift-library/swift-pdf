@@ -12,7 +12,7 @@ Phase-1 focuses on a thin, reusable viewing foundation with clean seams for futu
 - `PDFViewContainer`: SwiftUI host/container boundary (`PDFKit` bridge).
 - `.pdf.displayMode(_:)` / `.pdf.displayDirection(_:)` / `.pdf.autoScales(_:)` / `.pdf.isInMarkupMode(_:)`: viewer configuration boundary.
 - `.pdf.page(_:)` + `.pdf.pageCount(_:)`: declarative navigation boundary.
-- `.pdf.searchQuery(_:)` + `.pdf.searchSelection(_:)` + `.pdf.searchResultCount(_:)` + `.pdf.searchOptions(_:)` + `.pdf.searchResults(_:)`: declarative search boundary.
+- `.pdf.searchQuery(_:)` + `.pdf.searchSelection(_:)` + `.pdf.searchResultCount(_:)` + `.pdf.searchOptions(_:)` + `.pdf.searchResults(_:)`: declarative search boundary, with search options bound as official `NSString.CompareOptions`.
 - `.pdf.overlay(_:)`: per-page SwiftUI overlay hook boundary.
 
 ## Installation
@@ -36,7 +36,7 @@ struct ReaderView: View {
     @State private var searchQuery = ""
     @State private var searchSelection: Int? = nil
     @State private var searchResultCount = 0
-    @State private var searchOptions = PDFSearchOptions()
+    @State private var searchOptions: NSString.CompareOptions = [.caseInsensitive]
     @State private var searchResults: [PDFSearchHit] = []
 
     let source: PDFDocumentSource
@@ -104,6 +104,16 @@ Button("Next") {
 }
 ```
 
+Use official Foundation compare options when you need non-default matching behavior:
+
+```swift
+searchOptions = [.caseInsensitive]
+searchOptions = [.caseInsensitive, .diacriticInsensitive]
+searchOptions = []
+```
+
+If `.pdf.searchOptions(_:)` is not bound, search runs with `[]`.
+
 ## Overlay hooks
 
 Attach a per-page SwiftUI overlay:
@@ -127,7 +137,7 @@ PDF(source: source)
 Overlay behavior is explicit by platform:
 
 - iOS / visionOS / macOS: callbacks are forwarded to `PDFKit` page overlay hooks.
-- `overlayRelease` is lifecycle-based: any overlay host removal path triggers release.
+- `overlayRelease` is lifecycle-based: any overlay view lifecycle removal path triggers release.
 
 ## PDFKit function mapping
 

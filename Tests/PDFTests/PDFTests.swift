@@ -313,7 +313,7 @@ func searchBindingsPublishMatchesAndSupportSelectionControl() throws {
   let queryBox = StringBindingBox("the")
   let selectionBox = OptionalIntBindingBox(nil)
   let resultCountBox = IntBindingBox(0)
-  let optionsBox = SearchOptionsBindingBox(.default)
+  let optionsBox = SearchOptionsBindingBox([.caseInsensitive])
   let resultsBox = SearchResultsBindingBox([])
 
   bindCoordinator(coordinator,
@@ -354,6 +354,53 @@ func searchBindingsPublishMatchesAndSupportSelectionControl() throws {
 
 @Test
 @MainActor
+func searchQueryRefreshMovesPageBindingToFirstSearchMatch() throws {
+  let document = try #require(PDFDocument(url: fixturePDFURL()))
+  #expect(document.pageCount > 1)
+
+  let coordinator = PDFViewContainer.Coordinator()
+  let pdfView = PDFView()
+
+  let pageIndexBox = IntBindingBox(0)
+  let pageCountBox = IntBindingBox(0)
+  let queryBox = StringBindingBox("apple")
+  let selectionBox = OptionalIntBindingBox(nil)
+  let resultCountBox = IntBindingBox(0)
+  let optionsBox = SearchOptionsBindingBox([.caseInsensitive])
+  let resultsBox = SearchResultsBindingBox([])
+
+  bindCoordinator(coordinator,
+    pdfView: pdfView,
+    initialSource: .document(document),
+    pageIndexBinding: makeBinding(for: pageIndexBox),
+    pageCountBinding: makeBinding(for: pageCountBox),
+    searchQueryBinding: makeBinding(for: queryBox),
+    searchSelectionBinding: makeBinding(for: selectionBox),
+    searchResultCountBinding: makeBinding(for: resultCountBox),
+    searchOptionsBinding: makeBinding(for: optionsBox),
+    searchResultsBinding: makeBinding(for: resultsBox)
+  )
+  bindCoordinator(coordinator,
+    pdfView: pdfView,
+    initialSource: .document(document),
+    pageIndexBinding: makeBinding(for: pageIndexBox),
+    pageCountBinding: makeBinding(for: pageCountBox),
+    searchQueryBinding: makeBinding(for: queryBox),
+    searchSelectionBinding: makeBinding(for: selectionBox),
+    searchResultCountBinding: makeBinding(for: resultCountBox),
+    searchOptionsBinding: makeBinding(for: optionsBox),
+    searchResultsBinding: makeBinding(for: resultsBox)
+  )
+
+  let selectedIndex = try #require(selectionBox.value)
+  #expect(resultsBox.value.indices.contains(selectedIndex))
+  #expect(pageCountBox.value == document.pageCount)
+  #expect(pageIndexBox.value == resultsBox.value[selectedIndex].pageIndex)
+  #expect(pageIndexBox.value > 0)
+}
+
+@Test
+@MainActor
 func searchOptionsChangesTriggerRecomputationWithoutChangingQuery() throws {
   let document = try #require(PDFDocument(url: fixturePDFURL()))
 
@@ -363,7 +410,7 @@ func searchOptionsChangesTriggerRecomputationWithoutChangingQuery() throws {
   let queryBox = StringBindingBox("apple")
   let selectionBox = OptionalIntBindingBox(nil)
   let resultCountBox = IntBindingBox(0)
-  let optionsBox = SearchOptionsBindingBox(.default)
+  let optionsBox = SearchOptionsBindingBox([.caseInsensitive])
   let resultsBox = SearchResultsBindingBox([])
 
   bindCoordinator(coordinator,
@@ -381,7 +428,7 @@ func searchOptionsChangesTriggerRecomputationWithoutChangingQuery() throws {
   #expect(resultCountBox.value > 0)
   #expect(resultsBox.value.count == resultCountBox.value)
 
-  optionsBox.value = PDFSearchOptions(caseInsensitive: false)
+  optionsBox.value = []
   bindCoordinator(coordinator,
     pdfView: pdfView,
     initialSource: .document(document),
@@ -410,7 +457,7 @@ func clearingSearchQueryResetsSearchBindings() throws {
   let queryBox = StringBindingBox("Quartz")
   let selectionBox = OptionalIntBindingBox(nil)
   let resultCountBox = IntBindingBox(0)
-  let optionsBox = SearchOptionsBindingBox(.default)
+  let optionsBox = SearchOptionsBindingBox([.caseInsensitive])
   let resultsBox = SearchResultsBindingBox([])
 
   bindCoordinator(coordinator,
@@ -453,7 +500,7 @@ func switchingDocumentRefreshesSearchBindingsAgainstNewDocument() throws {
   let queryBox = StringBindingBox("the")
   let selectionBox = OptionalIntBindingBox(nil)
   let resultCountBox = IntBindingBox(0)
-  let optionsBox = SearchOptionsBindingBox(.default)
+  let optionsBox = SearchOptionsBindingBox([.caseInsensitive])
   let resultsBox = SearchResultsBindingBox([])
 
   bindCoordinator(coordinator,
@@ -476,6 +523,90 @@ func switchingDocumentRefreshesSearchBindingsAgainstNewDocument() throws {
   #expect(resultCountBox.value == 0)
   #expect(selectionBox.value == nil)
   #expect(resultsBox.value == [])
+}
+
+@Test
+@MainActor
+func documentLoadPublishesPageBindingsBeforeSearchBindings() throws {
+  let document = try #require(PDFDocument(url: fixturePDFURL()))
+  let emptyDocument = PDFDocument()
+
+  let coordinator = PDFViewContainer.Coordinator()
+  let pdfView = PDFView()
+
+  var pageIndexValue = 0
+  var pageCountValue = 0
+  var queryValue = "the"
+  var selectionValue: Int? = nil
+  var resultCountValue = 0
+  var optionsValue: NSString.CompareOptions = [.caseInsensitive]
+  var resultsValue: [PDFSearchHit] = []
+  var events: [String] = []
+
+  let pageIndexBinding = Binding(
+    get: { pageIndexValue },
+    set: {
+      pageIndexValue = $0
+      events.append("pageIndex")
+    }
+  )
+  let pageCountBinding = Binding(
+    get: { pageCountValue },
+    set: {
+      pageCountValue = $0
+      events.append("pageCount")
+    }
+  )
+  let queryBinding = Binding(
+    get: { queryValue },
+    set: { queryValue = $0 }
+  )
+  let selectionBinding = Binding(
+    get: { selectionValue },
+    set: {
+      selectionValue = $0
+      events.append("searchSelection")
+    }
+  )
+  let resultCountBinding = Binding(
+    get: { resultCountValue },
+    set: {
+      resultCountValue = $0
+      events.append("searchResultCount")
+    }
+  )
+  let optionsBinding = Binding(
+    get: { optionsValue },
+    set: { optionsValue = $0 }
+  )
+  let resultsBinding = Binding(
+    get: { resultsValue },
+    set: {
+      resultsValue = $0
+      events.append("searchResults")
+    }
+  )
+
+  bindCoordinator(coordinator,
+    pdfView: pdfView,
+    initialSource: .document(emptyDocument),
+    pageIndexBinding: pageIndexBinding,
+    pageCountBinding: pageCountBinding,
+    searchQueryBinding: queryBinding,
+    searchSelectionBinding: selectionBinding,
+    searchResultCountBinding: resultCountBinding,
+    searchOptionsBinding: optionsBinding,
+    searchResultsBinding: resultsBinding
+  )
+
+  events.removeAll()
+  coordinator.loadDocumentIfNeeded(.document(document))
+
+  let firstSearchEventIndex = try #require(events.firstIndex { $0.hasPrefix("search") })
+  #expect(events.first == "pageCount")
+  #expect(events[..<firstSearchEventIndex].contains("pageCount"))
+  #expect(resultCountValue > 0)
+  #expect(selectionValue != nil)
 }
 
 @Test
@@ -652,8 +783,79 @@ func coordinatorConformsToOverlayProviderOnCurrentPlatform() throws {
 
 @Test
 @MainActor
-func overlayRegistryRefreshRemovalTriggersRelease() throws {
-  var registry = PDFOverlayHostRegistry()
+func coordinatorDetachClearsOverlayHostsAndReleasesPagesOnce() throws {
+  let document = try #require(PDFDocument(url: fixturePDFURL()))
+  let page = try #require(document.page(at: 0))
+
+  let coordinator = PDFViewContainer.Coordinator()
+  let pdfView = PDFView()
+
+  bindCoordinator(
+    coordinator,
+    pdfView: pdfView,
+    initialSource: .document(document),
+    pageIndexBinding: nil,
+    pageCountBinding: nil
+  )
+
+  var released: [ObjectIdentifier] = []
+  coordinator.updatePageOverlayViewCallbacks(
+    PDFPageOverlayViewCallbacks(
+      contentProvider: { _ in AnyView(Color.red) },
+      release: { released.append(ObjectIdentifier($0)) }
+    )
+  )
+
+  createOverlayView(using: coordinator, for: page)
+  coordinator.detach()
+  coordinator.didEndDisplayingOverlayView(for: page)
+
+  #expect(released == [ObjectIdentifier(page)])
+}
+
+@Test
+@MainActor
+func coordinatorViewReplacementClearsOverlayHostsAndReleasesPagesOnce() throws {
+  let document = try #require(PDFDocument(url: fixturePDFURL()))
+  let page = try #require(document.page(at: 0))
+
+  let coordinator = PDFViewContainer.Coordinator()
+  let firstView = PDFView()
+  let secondView = PDFView()
+
+  bindCoordinator(
+    coordinator,
+    pdfView: firstView,
+    initialSource: .document(document),
+    pageIndexBinding: nil,
+    pageCountBinding: nil
+  )
+
+  var released: [ObjectIdentifier] = []
+  coordinator.updatePageOverlayViewCallbacks(
+    PDFPageOverlayViewCallbacks(
+      contentProvider: { _ in AnyView(Color.red) },
+      release: { released.append(ObjectIdentifier($0)) }
+    )
+  )
+
+  createOverlayView(using: coordinator, for: page)
+  bindCoordinator(
+    coordinator,
+    pdfView: secondView,
+    initialSource: .document(document),
+    pageIndexBinding: nil,
+    pageCountBinding: nil
+  )
+  coordinator.didEndDisplayingOverlayView(for: page)
+
+  #expect(released == [ObjectIdentifier(page)])
+}
+
+@Test
+@MainActor
+func overlayViewRegistryRefreshRemovalTriggersRelease() throws {
+  var registry = PDFPageOverlayViewRegistry()
 
   let document = try #require(PDFDocument(url: fixturePDFURL()))
   let page = try #require(document.page(at: 0))
@@ -675,8 +877,8 @@ func overlayRegistryRefreshRemovalTriggersRelease() throws {
 
 @Test
 @MainActor
-func overlayRegistryClearTriggersReleaseForAllHosts() throws {
-  var registry = PDFOverlayHostRegistry()
+func overlayViewRegistryClearTriggersReleaseForAllHosts() throws {
+  var registry = PDFPageOverlayViewRegistry()
 
   let document = try #require(PDFDocument(url: fixturePDFURL()))
   #expect(document.pageCount > 1)
@@ -698,8 +900,8 @@ func overlayRegistryClearTriggersReleaseForAllHosts() throws {
 
 @Test
 @MainActor
-func overlayRegistryReleaseIsNotDuplicatedAfterRefreshRemovalThenEndDisplay() throws {
-  var registry = PDFOverlayHostRegistry()
+func overlayViewRegistryReleaseIsNotDuplicatedAfterRefreshRemovalThenEndDisplay() throws {
+  var registry = PDFPageOverlayViewRegistry()
 
   let document = try #require(PDFDocument(url: fixturePDFURL()))
   let page = try #require(document.page(at: 0))
@@ -730,7 +932,7 @@ func primaryViewAndModifierSurfaceCompiles() {
     @State private var searchQuery: String = ""
     @State private var searchSelection: Int? = nil
     @State private var searchResultCount: Int = 0
-    @State private var searchOptions: PDFSearchOptions = .default
+    @State private var searchOptions: NSString.CompareOptions = [.caseInsensitive]
     @State private var searchResults: [PDFSearchHit] = []
 
     var body: some View {
@@ -777,7 +979,7 @@ func pdfNamespaceModifierSurfaceCompiles() {
     @State private var searchQuery: String = ""
     @State private var searchSelection: Int? = nil
     @State private var searchResultCount: Int = 0
-    @State private var searchOptions: PDFSearchOptions = .default
+    @State private var searchOptions: NSString.CompareOptions = [.caseInsensitive]
     @State private var searchResults: [PDFSearchHit] = []
 
     var body: some View {
@@ -815,7 +1017,7 @@ private func bindCoordinator(
   searchQueryBinding: Binding<String>? = nil,
   searchSelectionBinding: Binding<Int?>? = nil,
   searchResultCountBinding: Binding<Int>? = nil,
-  searchOptionsBinding: Binding<PDFSearchOptions>? = nil,
+  searchOptionsBinding: Binding<NSString.CompareOptions>? = nil,
   searchResultsBinding: Binding<[PDFSearchHit]>? = nil
 ) {
   coordinator.bind(
@@ -833,6 +1035,18 @@ private func bindCoordinator(
       results: searchResultsBinding
     )
   )
+}
+
+@MainActor
+private func createOverlayView(
+  using coordinator: PDFViewContainer.Coordinator,
+  for page: PDFPage
+) {
+  #if canImport(UIKit)
+    _ = coordinator.overlayView(for: page)
+  #elseif canImport(AppKit)
+    _ = coordinator.overlayView(for: page)
+  #endif
 }
 
 @MainActor
@@ -864,9 +1078,9 @@ private final class OptionalIntBindingBox {
 
 @MainActor
 private final class SearchOptionsBindingBox {
-  var value: PDFSearchOptions
+  var value: NSString.CompareOptions
 
-  init(_ value: PDFSearchOptions) {
+  init(_ value: NSString.CompareOptions) {
     self.value = value
   }
 }
@@ -905,7 +1119,7 @@ private func makeBinding(for box: OptionalIntBindingBox) -> Binding<Int?> {
 }
 
 @MainActor
-private func makeBinding(for box: SearchOptionsBindingBox) -> Binding<PDFSearchOptions> {
+private func makeBinding(for box: SearchOptionsBindingBox) -> Binding<NSString.CompareOptions> {
   Binding(
     get: { box.value },
     set: { box.value = $0 }

@@ -5,7 +5,7 @@ public enum PDFDocumentSource {
   case document(PDFDocument)
   case data(Data)
   case fileURL(URL)
-  
+
   public func resolveDocument() -> PDFDocument? {
     switch self {
     case .document(let document):

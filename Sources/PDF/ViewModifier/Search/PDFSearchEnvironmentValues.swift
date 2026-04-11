@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 extension EnvironmentValues {
@@ -11,7 +12,7 @@ extension EnvironmentValues {
   var searchResultCountBinding: Binding<Int>? = nil
 
   @Entry
-  var searchOptionsBinding: Binding<PDFSearchOptions>? = nil
+  var searchOptionsBinding: Binding<NSString.CompareOptions>? = nil
 
   @Entry
   var searchResultsBinding: Binding<[PDFSearchHit]>? = nil

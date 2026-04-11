@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 @MainActor
@@ -14,7 +15,7 @@ extension PDFViewBase where Base: View {
     base.environment(\.searchResultCountBinding, count)
   }
 
-  public func searchOptions(_ options: Binding<PDFSearchOptions>) -> some View {
+  public func searchOptions(_ options: Binding<NSString.CompareOptions>) -> some View {
     base.environment(\.searchOptionsBinding, options)
   }
 

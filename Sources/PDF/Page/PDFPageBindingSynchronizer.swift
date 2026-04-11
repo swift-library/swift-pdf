@@ -70,6 +70,19 @@ final class PDFPageBindingSynchronizer {
     lastPublishedPageIndex = currentIndex
   }
 
+  func navigateToSearchMatch(on pdfView: PDFView?, target: PDFSearchRuntime.FocusTarget?) {
+    guard let pdfView, let target else {
+      return
+    }
+
+    if let page = target.page, !target.bounds.isNull && !target.bounds.isEmpty {
+      pdfView.go(to: target.bounds, on: page)
+      return
+    }
+
+    pdfView.go(to: target.selection)
+  }
+
   private func clampedPageIndex(_ index: Int, pageCount: Int) -> Int {
     guard pageCount > 0 else {
       return 0

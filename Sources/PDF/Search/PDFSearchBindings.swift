@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 @MainActor
@@ -5,14 +6,14 @@ struct PDFSearchBindings {
   var query: Binding<String>?
   var selection: Binding<Int?>?
   var resultCount: Binding<Int>?
-  var options: Binding<PDFSearchOptions>?
+  var options: Binding<NSString.CompareOptions>?
   var results: Binding<[PDFSearchHit]>?
 
   init(
     query: Binding<String>? = nil,
     selection: Binding<Int?>? = nil,
     resultCount: Binding<Int>? = nil,
-    options: Binding<PDFSearchOptions>? = nil,
+    options: Binding<NSString.CompareOptions>? = nil,
     results: Binding<[PDFSearchHit]>? = nil
   ) {
     self.query = query

@@ -19,14 +19,14 @@ extension PDFViewContainer {
     private let pageBindingSynchronizer = PDFPageBindingSynchronizer()
     private let searchRuntime = PDFSearchRuntime()
     private let searchBindingSynchronizer = PDFSearchBindingSynchronizer()
-    private let overlayRuntime = PDFOverlayRuntime()
+    private let pageOverlayViewLifecycle = PDFPageOverlayViewLifecycle()
 
     private var pageBindings = PDFPageBindings()
     private var searchBindings = PDFSearchBindings()
 
     func bind(
       pdfView: PDFView,
-      initialSource: PDFDocumentSource,
+      source: PDFDocumentSource,
       pageBindings: PDFPageBindings,
       searchBindings: PDFSearchBindings
     ) {
@@ -34,7 +34,7 @@ extension PDFViewContainer {
 
       if viewChanged {
         removeObservers()
-        overlayRuntime.clearHosts()
+        pageOverlayViewLifecycle.clearOverlayViews()
         self.pdfView = pdfView
         installObservers(for: pdfView)
         documentLoader.resetLoadedSourceIdentity()
@@ -46,14 +46,14 @@ extension PDFViewContainer {
       self.pageBindings = pageBindings
       self.searchBindings = searchBindings
 
-      _ = loadDocument(from: initialSource, forceReload: false)
+      _ = loadSourceIfNeeded(source, forceReload: false)
 
       refreshPageBindings(applyExternalPage: true)
       refreshSearchBindings()
     }
 
     func loadDocumentIfNeeded(_ source: PDFDocumentSource) {
-      _ = loadDocument(from: source, forceReload: false)
+      _ = loadSourceIfNeeded(source, forceReload: false)
       refreshPageBindings(applyExternalPage: true)
       refreshSearchBindings()
     }
@@ -68,33 +68,33 @@ extension PDFViewContainer {
       searchRuntime.reset()
       searchBindingSynchronizer.reset()
       documentLoader.resetLoadedSourceIdentity()
-      overlayRuntime.clearHosts()
+      pageOverlayViewLifecycle.clearOverlayViews()
     }
 
-    func updateOverlayCallbacks(_ callbacks: PDFOverlayCallbacks) {
-      overlayRuntime.updateCallbacks(
+    func updatePageOverlayViewCallbacks(_ callbacks: PDFPageOverlayViewCallbacks) {
+      pageOverlayViewLifecycle.updateCallbacks(
         contentProvider: callbacks.contentProvider,
         release: callbacks.release
       )
-      overlayRuntime.refreshHostsIfNeeded()
+      pageOverlayViewLifecycle.refreshOverlayViewsIfNeeded()
     }
 
     #if canImport(UIKit)
       func overlayView(for page: PDFPage) -> UIView? {
-        overlayRuntime.overlayView(for: page)
+        pageOverlayViewLifecycle.overlayView(for: page)
       }
     #elseif canImport(AppKit)
       func overlayView(for page: PDFPage) -> NSView? {
-        overlayRuntime.overlayView(for: page)
+        pageOverlayViewLifecycle.overlayView(for: page)
       }
     #endif
 
     func willDisplayOverlayView(for page: PDFPage) {
-      overlayRuntime.willDisplayOverlayView(for: page)
+      pageOverlayViewLifecycle.willDisplayOverlayView(for: page)
     }
 
     func didEndDisplayingOverlayView(for page: PDFPage) {
-      overlayRuntime.didEndDisplayingOverlayView(for: page)
+      pageOverlayViewLifecycle.didEndDisplayingOverlayView(for: page)
     }
 
     private func installObservers(for pdfView: PDFView) {
@@ -136,7 +136,7 @@ extension PDFViewContainer {
     }
 
     @discardableResult
-    private func loadDocument(from source: PDFDocumentSource, forceReload: Bool = true) -> Bool {
+    private func loadSourceIfNeeded(_ source: PDFDocumentSource, forceReload: Bool = true) -> Bool {
       let didLoad = documentLoader.load(source: source, forceReload: forceReload, into: pdfView)
       guard didLoad else {
         return false
@@ -169,7 +169,14 @@ extension PDFViewContainer {
         selectionBinding: searchBindings.selection,
         resultCountBinding: searchBindings.resultCount,
         optionsBinding: searchBindings.options,
-        resultsBinding: searchBindings.results
+        resultsBinding: searchBindings.results,
+        navigateToSearchMatch: { [weak self] target in
+          guard let self else {
+            return
+          }
+
+          self.pageBindingSynchronizer.navigateToSearchMatch(on: self.pdfView, target: target)
+        }
       )
     }
   }
