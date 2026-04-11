@@ -20,10 +20,11 @@
 
     var body: some View {
       GeometryReader { proxy in
+        let phoneInsets = resolvedPhonePreviewInsets(from: proxy.safeAreaInsets)
         content
           .frame(maxWidth: .infinity, maxHeight: .infinity)
-          .padding(.top, phoneTopCompensation(safeTop: proxy.safeAreaInsets.top))
-          .padding(.bottom, phoneBottomCompensation(safeBottom: proxy.safeAreaInsets.bottom))
+          .padding(.top, phoneInsets.top)
+          .padding(.bottom, phoneInsets.bottom)
           .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
       }
       .frame(minHeight: minimumPreviewHeight)
@@ -38,22 +39,39 @@
       return 760
     }
 
-    private func phoneTopCompensation(safeTop: CGFloat) -> CGFloat {
+    private func resolvedPhonePreviewInsets(from geometryInsets: EdgeInsets) -> EdgeInsets {
       #if canImport(UIKit)
-        if UIDevice.current.userInterfaceIdiom == .phone {
-          return max(safeTop, 59)
+        guard UIDevice.current.userInterfaceIdiom == .phone else {
+          return .init(top: 0, leading: 0, bottom: 0, trailing: 0)
         }
+
+        return .init(
+          top: max(geometryInsets.top, keyWindowSafeAreaInsets.top),
+          leading: 0,
+          bottom: max(geometryInsets.bottom, keyWindowSafeAreaInsets.bottom),
+          trailing: 0
+        )
+      #else
+        return .init(top: 0, leading: 0, bottom: 0, trailing: 0)
       #endif
-      return 0
     }
 
-    private func phoneBottomCompensation(safeBottom: CGFloat) -> CGFloat {
-      #if canImport(UIKit)
-        if UIDevice.current.userInterfaceIdiom == .phone {
-          return max(safeBottom, 34)
+    #if canImport(UIKit)
+      private var keyWindowSafeAreaInsets: UIEdgeInsets {
+        let windowScenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+
+        for scene in windowScenes {
+          if let keyWindow = scene.windows.first(where: \.isKeyWindow) {
+            return keyWindow.safeAreaInsets
+          }
         }
-      #endif
-      return 0
-    }
+
+        if let firstWindow = windowScenes.first?.windows.first {
+          return firstWindow.safeAreaInsets
+        }
+
+        return .zero
+      }
+    #endif
   }
 #endif
