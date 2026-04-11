@@ -1,3 +1,4 @@
+import Combine
 import PDFKit
 import SwiftUI
 
@@ -12,11 +13,12 @@ extension PDFViewContainer {
   public final class Coordinator: NSObject {
     private weak var pdfView: PDFView?
 
-    private var pageChangedObserver: NSObjectProtocol?
-    private var scaleChangedObserver: NSObjectProtocol?
+    private let pdfViewNotificationPublisher = PDFViewNotificationPublisher()
+    private var observerPublishers = Set<AnyCancellable>()
 
     private let documentLoader = PDFDocument.Representation.Loader()
-    private let pageBindingSynchronizer = PDFPageBindingSynchronizer()
+    private let pageStateBindingSynchronizer = PDFPageStateBindingSynchronizer()
+    private let pageNavigation = PDFPageNavigation()
     private let searchRuntime = PDFSearchRuntime()
     private let searchBindingSynchronizer = PDFSearchBindingSynchronizer()
     private let pageOverlayViewLifecycle = PDFPageOverlayViewLifecycle()
@@ -33,12 +35,12 @@ extension PDFViewContainer {
       let viewChanged = self.pdfView !== pdfView
 
       if viewChanged {
-        removeObservers()
+        removePublishers()
         pageOverlayViewLifecycle.clearOverlayViews()
         self.pdfView = pdfView
-        installObservers(for: pdfView)
+        installPublishers(for: pdfView)
         documentLoader.resetCachedIdentifier()
-        pageBindingSynchronizer.reset()
+        pageStateBindingSynchronizer.reset()
         searchRuntime.reset()
         searchBindingSynchronizer.reset()
       }
@@ -59,12 +61,12 @@ extension PDFViewContainer {
     }
 
     func detach() {
-      removeObservers()
+      removePublishers()
 
       pdfView = nil
       pageBindings = PDFPageBindings()
       searchBindings = PDFSearchBindings()
-      pageBindingSynchronizer.reset()
+      pageStateBindingSynchronizer.reset()
       searchRuntime.reset()
       searchBindingSynchronizer.reset()
       documentLoader.resetCachedIdentifier()
@@ -97,42 +99,30 @@ extension PDFViewContainer {
       pageOverlayViewLifecycle.didEndDisplayingOverlayView(for: page)
     }
 
-    private func installObservers(for pdfView: PDFView) {
-      let center = NotificationCenter.default
+    private func installPublishers(for pdfView: PDFView) {
+      removePublishers()
 
-      pageChangedObserver = center.addObserver(
-        forName: Notification.Name.PDFViewPageChanged,
-        object: pdfView,
-        queue: .main
-      ) { [weak self] _ in
-        Task { @MainActor [weak self] in
-          self?.refreshPageBindings(applyExternalPage: false)
-        }
-      }
+      pdfViewNotificationPublisher.onPageChanged(
+        for: pdfView,
+        observer: self,
+        storeIn: &observerPublishers,
+        perform: Coordinator.handlePageOrScaleChanged
+      )
 
-      scaleChangedObserver = center.addObserver(
-        forName: Notification.Name.PDFViewScaleChanged,
-        object: pdfView,
-        queue: .main
-      ) { [weak self] _ in
-        Task { @MainActor [weak self] in
-          self?.refreshPageBindings(applyExternalPage: false)
-        }
-      }
+      pdfViewNotificationPublisher.onScaleChanged(
+        for: pdfView,
+        observer: self,
+        storeIn: &observerPublishers,
+        perform: Coordinator.handlePageOrScaleChanged
+      )
     }
 
-    private func removeObservers() {
-      let center = NotificationCenter.default
+    private func removePublishers() {
+      observerPublishers.removeAll()
+    }
 
-      if let pageChangedObserver {
-        center.removeObserver(pageChangedObserver)
-        self.pageChangedObserver = nil
-      }
-
-      if let scaleChangedObserver {
-        center.removeObserver(scaleChangedObserver)
-        self.scaleChangedObserver = nil
-      }
+    private func handlePageOrScaleChanged() {
+      refreshPageBindings(applyExternalPage: false)
     }
 
     @discardableResult
@@ -151,13 +141,16 @@ extension PDFViewContainer {
 
     private func refreshPageBindings(applyExternalPage: Bool) {
       if applyExternalPage {
-        pageBindingSynchronizer.applyExternalPageIndexIfNeeded(
+        let pageToNavigate = pageStateBindingSynchronizer.externalPageToNavigateIfNeeded(
           on: pdfView,
           pageIndexBinding: pageBindings.pageIndex
         )
+        if let pageToNavigate {
+          pageNavigation.navigate(to: pageToNavigate, on: pdfView)
+        }
       }
 
-      pageBindingSynchronizer.publish(
+      pageStateBindingSynchronizer.publish(
         on: pdfView,
         pageIndexBinding: pageBindings.pageIndex,
         pageCountBinding: pageBindings.pageCount
@@ -178,7 +171,7 @@ extension PDFViewContainer {
             return
           }
 
-          self.pageBindingSynchronizer.navigateToSearchMatch(on: self.pdfView, target: target)
+          self.pageNavigation.navigate(to: target, on: self.pdfView)
         }
       )
     }

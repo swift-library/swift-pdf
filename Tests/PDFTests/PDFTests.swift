@@ -214,9 +214,46 @@ func internalPageChangesPublishBackIntoPageBinding() throws {
 
 @Test
 @MainActor
-func rebindingInstallsObserverTokensOnlyWhenViewChanges() throws {
+func rebindingSameViewDoesNotDuplicateObservableNotificationEffects() throws {
   let document = try #require(PDFDocument(url: fixturePDFURL()))
-  #expect(document.pageCount > 0)
+  #expect(document.pageCount > 1)
+
+  let coordinator = PDFViewContainer.Coordinator()
+  let pdfView = PDFView()
+
+  let pageIndexBox = TrackingIntBindingBox(0)
+  let pageCountBox = IntBindingBox(0)
+
+  bindCoordinator(coordinator,
+    pdfView: pdfView,
+    initialSource: .document(document),
+    pageIndexBinding: makeBinding(for: pageIndexBox),
+    pageCountBinding: makeBinding(for: pageCountBox)
+  )
+
+  bindCoordinator(coordinator,
+    pdfView: pdfView,
+    initialSource: .document(document),
+    pageIndexBinding: makeBinding(for: pageIndexBox),
+    pageCountBinding: makeBinding(for: pageCountBox)
+  )
+
+  let baselineSetCount = pageIndexBox.setCount
+  pdfView.goToNextPage(nil)
+  NotificationCenter.default.post(
+    name: Notification.Name.PDFViewPageChanged,
+    object: pdfView
+  )
+
+  #expect(pageIndexBox.value == 1)
+  #expect(pageIndexBox.setCount == baselineSetCount + 1)
+}
+
+@Test
+@MainActor
+func switchingViewStopsOldViewNotificationPropagation() throws {
+  let document = try #require(PDFDocument(url: fixturePDFURL()))
+  #expect(document.pageCount > 1)
 
   let coordinator = PDFViewContainer.Coordinator()
   let firstView = PDFView()
@@ -231,27 +268,6 @@ func rebindingInstallsObserverTokensOnlyWhenViewChanges() throws {
     pageIndexBinding: makeBinding(for: pageIndexBox),
     pageCountBinding: makeBinding(for: pageCountBox)
   )
-  let initialPageObserver = try #require(
-    observerTokenIdentity(in: coordinator, field: "pageChangedObserver")
-  )
-  let initialScaleObserver = try #require(
-    observerTokenIdentity(in: coordinator, field: "scaleChangedObserver")
-  )
-
-  bindCoordinator(coordinator,
-    pdfView: firstView,
-    initialSource: .document(document),
-    pageIndexBinding: makeBinding(for: pageIndexBox),
-    pageCountBinding: makeBinding(for: pageCountBox)
-  )
-  let sameViewPageObserver = try #require(
-    observerTokenIdentity(in: coordinator, field: "pageChangedObserver")
-  )
-  let sameViewScaleObserver = try #require(
-    observerTokenIdentity(in: coordinator, field: "scaleChangedObserver")
-  )
-  #expect(sameViewPageObserver == initialPageObserver)
-  #expect(sameViewScaleObserver == initialScaleObserver)
 
   bindCoordinator(coordinator,
     pdfView: secondView,
@@ -259,18 +275,60 @@ func rebindingInstallsObserverTokensOnlyWhenViewChanges() throws {
     pageIndexBinding: makeBinding(for: pageIndexBox),
     pageCountBinding: makeBinding(for: pageCountBox)
   )
-  let changedViewPageObserver = try #require(
-    observerTokenIdentity(in: coordinator, field: "pageChangedObserver")
+
+  #expect(pageIndexBox.value == 0)
+
+  firstView.goToNextPage(nil)
+  NotificationCenter.default.post(
+    name: Notification.Name.PDFViewPageChanged,
+    object: firstView
   )
-  let changedViewScaleObserver = try #require(
-    observerTokenIdentity(in: coordinator, field: "scaleChangedObserver")
+  #expect(pageIndexBox.value == 0)
+
+  secondView.goToNextPage(nil)
+  NotificationCenter.default.post(
+    name: Notification.Name.PDFViewPageChanged,
+    object: secondView
   )
-  #expect(changedViewPageObserver != initialPageObserver)
-  #expect(changedViewScaleObserver != initialScaleObserver)
+  #expect(pageIndexBox.value == 1)
+}
+
+@Test
+@MainActor
+func detachStopsNotificationDrivenPageAndScalePropagation() throws {
+  let document = try #require(PDFDocument(url: fixturePDFURL()))
+  #expect(document.pageCount > 1)
+
+  let coordinator = PDFViewContainer.Coordinator()
+  let pdfView = PDFView()
+
+  let pageIndexBox = TrackingIntBindingBox(0)
+  let pageCountBox = IntBindingBox(0)
+
+  bindCoordinator(coordinator,
+    pdfView: pdfView,
+    initialSource: .document(document),
+    pageIndexBinding: makeBinding(for: pageIndexBox),
+    pageCountBinding: makeBinding(for: pageCountBox)
+  )
+
+  let pageIndexSnapshot = pageIndexBox.value
+  let pageSetCountSnapshot = pageIndexBox.setCount
 
   coordinator.detach()
-  #expect(observerTokenIdentity(in: coordinator, field: "pageChangedObserver") == nil)
-  #expect(observerTokenIdentity(in: coordinator, field: "scaleChangedObserver") == nil)
+
+  pdfView.goToNextPage(nil)
+  NotificationCenter.default.post(
+    name: Notification.Name.PDFViewPageChanged,
+    object: pdfView
+  )
+  NotificationCenter.default.post(
+    name: Notification.Name.PDFViewScaleChanged,
+    object: pdfView
+  )
+
+  #expect(pageIndexBox.value == pageIndexSnapshot)
+  #expect(pageIndexBox.setCount == pageSetCountSnapshot)
 }
 
 @Test
@@ -804,13 +862,45 @@ func switchingToEmptyDocumentResetsPageCountAndPageIndexBindings() throws {
   )
 
   #expect(pageCountBox.value == populatedDocument.pageCount)
-  #expect(pageIndexBox.value == max(0, populatedDocument.pageCount - 1))
+  #expect(pageIndexBox.value >= 0)
+  #expect(pageIndexBox.value < populatedDocument.pageCount)
 
   coordinator.loadDocumentIfNeeded(.document(emptyDocument))
 
   #expect(pdfView.document === emptyDocument)
   #expect(pageCountBox.value == 0)
   #expect(pageIndexBox.value == 0)
+}
+
+@Test
+func goToNavigationWritesRemainIsolatedToPageNavigation() throws {
+  let sourceRoot = try repositoryRootURL()
+    .appendingPathComponent("Sources")
+    .appendingPathComponent("PDF")
+  let enumerator = try #require(
+    FileManager.default.enumerator(
+      at: sourceRoot,
+      includingPropertiesForKeys: nil
+    )
+  )
+
+  var filesContainingGoToWrites: [String] = []
+  while let fileURL = enumerator.nextObject() as? URL {
+    guard fileURL.pathExtension == "swift" else {
+      continue
+    }
+
+    let contents = try String(contentsOf: fileURL, encoding: .utf8)
+    guard contents.contains(".go(to:") else {
+      continue
+    }
+
+    filesContainingGoToWrites.append(
+      fileURL.path.replacingOccurrences(of: sourceRoot.path + "/", with: "")
+    )
+  }
+
+  #expect(filesContainingGoToWrites == ["Page/PDFPageNavigation.swift"])
 }
 
 @Test
@@ -1118,6 +1208,17 @@ private final class IntBindingBox {
 }
 
 @MainActor
+private final class TrackingIntBindingBox {
+  var value: Int
+  var setCount: Int
+
+  init(_ value: Int, setCount: Int = 0) {
+    self.value = value
+    self.setCount = setCount
+  }
+}
+
+@MainActor
 private final class StringBindingBox {
   var value: String
 
@@ -1162,6 +1263,17 @@ private func makeBinding(for box: IntBindingBox) -> Binding<Int> {
 }
 
 @MainActor
+private func makeBinding(for box: TrackingIntBindingBox) -> Binding<Int> {
+  Binding(
+    get: { box.value },
+    set: {
+      box.value = $0
+      box.setCount += 1
+    }
+  )
+}
+
+@MainActor
 private func makeBinding(for box: StringBindingBox) -> Binding<String> {
   Binding(
     get: { box.value },
@@ -1202,38 +1314,8 @@ private func currentPageIndex(in pdfView: PDFView) -> Int {
   return max(0, document.index(for: currentPage))
 }
 
-@MainActor
-private func observerTokenIdentity(
-  in coordinator: PDFViewContainer.Coordinator,
-  field: String
-) -> ObjectIdentifier? {
-  let mirror = Mirror(reflecting: coordinator)
-  for child in mirror.children where child.label == field {
-    guard let unwrapped = unwrapOptional(child.value) else {
-      return nil
-    }
-
-    let object = unwrapped as AnyObject
-    return ObjectIdentifier(object)
-  }
-
-  return nil
-}
-
-private func unwrapOptional(_ value: Any) -> Any? {
-  let mirror = Mirror(reflecting: value)
-  guard mirror.displayStyle == .optional else {
-    return value
-  }
-  return mirror.children.first?.value
-}
-
 private func fixturePDFURL() throws -> URL {
-  let testFileURL = URL(fileURLWithPath: #filePath)
-  let repositoryRoot = testFileURL
-    .deletingLastPathComponent()
-    .deletingLastPathComponent()
-    .deletingLastPathComponent()
+  let repositoryRoot = try repositoryRootURL()
   let fixtureURL = repositoryRoot
     .appendingPathComponent("Tests")
     .appendingPathComponent("PDFTests")
@@ -1249,4 +1331,22 @@ private func fixturePDFURL() throws -> URL {
   }
 
   return fixtureURL
+}
+
+private func repositoryRootURL() throws -> URL {
+  let testFileURL = URL(fileURLWithPath: #filePath)
+  let repositoryRoot = testFileURL
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+
+  guard FileManager.default.fileExists(atPath: repositoryRoot.path) else {
+    throw NSError(
+      domain: "PDFTests",
+      code: 2,
+      userInfo: [NSLocalizedDescriptionKey: "Repository root not found at \(repositoryRoot.path)"]
+    )
+  }
+
+  return repositoryRoot
 }

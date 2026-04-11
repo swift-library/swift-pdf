@@ -20,7 +20,7 @@ final class PDFSearchBindingSynchronizer {
     resultCountBinding: Binding<Int>?,
     optionsBinding: Binding<NSString.CompareOptions>?,
     resultsBinding: Binding<[PDFSearchHit]>?,
-    navigateToSearchMatch: @MainActor (PDFSearchRuntime.FocusTarget?) -> Void
+    navigateToSearchMatch: @MainActor (PDFPageNavigation.Destination?) -> Void
   ) {
     let query = runtime.normalizedQuery(from: queryBinding?.wrappedValue)
     let options = optionsBinding?.wrappedValue ?? []
@@ -51,7 +51,7 @@ final class PDFSearchBindingSynchronizer {
     on pdfView: PDFView?,
     runtime: PDFSearchRuntime,
     selectionBinding: Binding<Int?>?,
-    navigateToSearchMatch: @MainActor (PDFSearchRuntime.FocusTarget?) -> Void
+    navigateToSearchMatch: @MainActor (PDFPageNavigation.Destination?) -> Void
   ) {
     guard let selectionBinding else {
       return

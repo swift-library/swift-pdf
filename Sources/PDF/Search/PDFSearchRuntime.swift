@@ -4,15 +4,9 @@ import Foundation
 
 @MainActor
 final class PDFSearchRuntime {
-  struct FocusTarget {
-    let selection: PDFSelection
-    let page: PDFPage?
-    let bounds: CGRect
-  }
-
   struct RefreshResult {
     let didRefresh: Bool
-    let navigationTarget: FocusTarget?
+    let navigationTarget: PDFPageNavigation.Destination?
   }
 
   struct Snapshot {
@@ -103,7 +97,7 @@ final class PDFSearchRuntime {
     return min(max(requestedSelection, 0), searchSelections.count - 1)
   }
 
-  func focusFirstResultIfNeeded(on pdfView: PDFView?) -> FocusTarget? {
+  func focusFirstResultIfNeeded(on pdfView: PDFView?) -> PDFPageNavigation.Destination? {
     guard currentSelectionIndex == nil else {
       return nil
     }
@@ -111,7 +105,7 @@ final class PDFSearchRuntime {
     return focusSelection(at: 0, on: pdfView)
   }
 
-  func focusSelection(at index: Int, on pdfView: PDFView?) -> FocusTarget? {
+  func focusSelection(at index: Int, on pdfView: PDFView?) -> PDFPageNavigation.Destination? {
     guard let pdfView else {
       return nil
     }
@@ -123,7 +117,7 @@ final class PDFSearchRuntime {
     currentSelectionIndex = index
     let selection = searchSelections[index]
     pdfView.setCurrentSelection(selection, animate: true)
-    return makeFocusTarget(for: selection)
+    return makeNavigationTarget(for: selection)
   }
 
   private func makeHits(from selections: [PDFSelection]) -> [PDFSearchHit] {
@@ -143,12 +137,12 @@ final class PDFSearchRuntime {
     }
   }
 
-  private func makeFocusTarget(for selection: PDFSelection) -> FocusTarget {
+  private func makeNavigationTarget(for selection: PDFSelection) -> PDFPageNavigation.Destination {
     guard let page = selection.pages.first else {
-      return FocusTarget(selection: selection, page: nil, bounds: .null)
+      return PDFPageNavigation.Destination(selection: selection, page: nil, bounds: .null)
     }
 
-    return FocusTarget(
+    return PDFPageNavigation.Destination(
       selection: selection,
       page: page,
       bounds: selection.bounds(for: page)

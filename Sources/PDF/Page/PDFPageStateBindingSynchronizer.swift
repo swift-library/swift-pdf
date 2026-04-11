@@ -2,7 +2,7 @@ import PDFKit
 import SwiftUI
 
 @MainActor
-final class PDFPageBindingSynchronizer {
+final class PDFPageStateBindingSynchronizer {
   private var lastAppliedExternalPageIndex: Int?
   private var lastPublishedPageIndex: Int?
   private var lastPublishedPageCount: Int?
@@ -13,13 +13,13 @@ final class PDFPageBindingSynchronizer {
     lastPublishedPageCount = nil
   }
 
-  func applyExternalPageIndexIfNeeded(on pdfView: PDFView?, pageIndexBinding: Binding<Int>?) {
+  func externalPageToNavigateIfNeeded(on pdfView: PDFView?, pageIndexBinding: Binding<Int>?) -> PDFPage? {
     guard let pageIndexBinding else {
-      return
+      return nil
     }
 
     let pageCount = pdfView?.document?.pageCount ?? 0
-    let requestedPageIndex = clampedPageIndex(pageIndexBinding.wrappedValue, pageCount: pageCount)
+    let requestedPageIndex = pageIndexBinding.wrappedValue.clamped(to: pageCount)
 
     if pageIndexBinding.wrappedValue != requestedPageIndex {
       pageIndexBinding.wrappedValue = requestedPageIndex
@@ -27,25 +27,27 @@ final class PDFPageBindingSynchronizer {
 
     guard let pdfView, let document = pdfView.document, pageCount > 0 else {
       lastAppliedExternalPageIndex = requestedPageIndex
-      return
+      return nil
     }
 
     if lastAppliedExternalPageIndex == requestedPageIndex
       && lastPublishedPageIndex == requestedPageIndex
     {
-      return
+      return nil
     }
 
     let currentIndex = currentPageIndex(in: pdfView, pageCount: pageCount)
     guard requestedPageIndex != currentIndex else {
       lastAppliedExternalPageIndex = requestedPageIndex
-      return
+      return nil
     }
 
     if let page = document.page(at: requestedPageIndex) {
       lastAppliedExternalPageIndex = requestedPageIndex
-      pdfView.go(to: page)
+      return page
     }
+
+    return nil
   }
 
   func publish(
@@ -69,28 +71,7 @@ final class PDFPageBindingSynchronizer {
 
     lastPublishedPageIndex = currentIndex
   }
-
-  func navigateToSearchMatch(on pdfView: PDFView?, target: PDFSearchRuntime.FocusTarget?) {
-    guard let pdfView, let target else {
-      return
-    }
-
-    if let page = target.page, !target.bounds.isNull && !target.bounds.isEmpty {
-      pdfView.go(to: target.bounds, on: page)
-      return
-    }
-
-    pdfView.go(to: target.selection)
-  }
-
-  private func clampedPageIndex(_ index: Int, pageCount: Int) -> Int {
-    guard pageCount > 0 else {
-      return 0
-    }
-
-    return min(max(index, 0), pageCount - 1)
-  }
-
+  
   private func currentPageIndex(in pdfView: PDFView?, pageCount: Int) -> Int {
     guard pageCount > 0,
       let pdfView,
@@ -100,6 +81,16 @@ final class PDFPageBindingSynchronizer {
       return 0
     }
 
-    return min(max(0, document.index(for: currentPage)), pageCount - 1)
+    return document.index(for: currentPage).clamped(to: pageCount)
+  }
+}
+
+private extension Int {
+  func clamped(to pageCount: Int) -> Int {
+    guard pageCount > 0 else {
+      return 0
+    }
+
+    return Swift.min(Swift.max(self, 0), pageCount - 1)
   }
 }
