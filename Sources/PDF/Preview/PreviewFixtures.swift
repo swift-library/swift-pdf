@@ -1,6 +1,5 @@
 #if DEBUG && canImport(SwiftUI) && PDF_INTERNAL_PREVIEW
   import Foundation
-  import PDFKit
 
   enum PreviewFixtures {
     static let fixtureRelativePath = "Tests/PDFTests/Fixtures/drawingwithquartz2d.pdf"
@@ -18,15 +17,6 @@
       }
 
       return pdfURL
-    }
-
-    static func previewSource(
-      filePath: StaticString = #filePath
-    ) -> PDFDocument.Representation? {
-      if let fixtureURL = fixtureURL(filePath: filePath) {
-        return .fileURL(fixtureURL)
-      }
-      return nil
     }
 
     private static func repositoryRootURL(startingAt filePath: StaticString) -> URL? {

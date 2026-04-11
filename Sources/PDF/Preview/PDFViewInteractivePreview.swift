@@ -55,6 +55,10 @@
       return "Matches: \(searchSelection + 1)/\(searchResultCount)"
     }
 
+    private var canClearSearch: Bool {
+      !(searchResultCount == 0 && searchQuery.isEmpty)
+    }
+
     @ViewBuilder
     private var documentBody: some View {
       let base = PDF(source: source)
@@ -109,23 +113,17 @@
             searchQuery: $searchQuery,
             searchResultCount: searchResultCount,
             searchSummary: searchSummary,
-            canClearSearch: !(searchResultCount == 0 && searchQuery.isEmpty),
+            canClearSearch: canClearSearch,
             onPreviousSearch: goToPreviousSearchResult,
             onNextSearch: goToNextSearchResult,
             onClearSearch: clearSearch
           )
         }
         .onChange(of: pageIndex) { _, _ in
-          if pageCount > 0 {
-            pageInput = "\(currentPageNumber)"
-          }
+          syncPageInput()
         }
         .onChange(of: pageCount) { _, _ in
-          if pageCount == 0 {
-            pageInput = "1"
-          } else {
-            pageInput = "\(currentPageNumber)"
-          }
+          syncPageInput()
         }
         .onChange(of: overlayMode) { _, _ in
           overlayTelemetry.reset()
@@ -133,7 +131,7 @@
         .onChange(of: isInMarkupMode) { _, _ in
           overlayTelemetry.reset()
         }
-        .frame(height: 600)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func goToFirstPage() {
@@ -188,6 +186,10 @@
       searchSelection = nil
     }
 
+    private func syncPageInput() {
+      pageInput = pageCount == 0 ? "1" : "\(currentPageNumber)"
+    }
+
     private func overlayKey(for page: PDFPage) -> String {
       if let label = page.label, !label.isEmpty {
         return label
@@ -206,30 +208,26 @@
       case .off:
         EmptyView()
       case .badge:
-        Text("Page \(pageKey)")
-          .font(.caption.monospaced().weight(.semibold))
-          .foregroundStyle(.white)
-          .padding(.horizontal, 10)
-          .padding(.vertical, 6)
-          .background(Color.black.opacity(0.78))
-          .clipShape(RoundedRectangle(cornerRadius: 8))
-          .padding(12)
-          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        overlayBadge("Page \(pageKey)", verticalPadding: 6)
       case .interactive:
-        Text("Tap \(pageKey)")
-          .font(.caption.monospaced().weight(.semibold))
-          .foregroundStyle(.white)
-          .padding(.horizontal, 10)
-          .padding(.vertical, 7)
-          .background(Color.black.opacity(0.78))
-          .clipShape(RoundedRectangle(cornerRadius: 8))
+        overlayBadge("Tap \(pageKey)", verticalPadding: 7)
           .contentShape(RoundedRectangle(cornerRadius: 8))
           .onTapGesture {
             overlayTelemetry.noteTapped(pageKey)
           }
-          .padding(12)
-          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       }
+    }
+
+    private func overlayBadge(_ label: String, verticalPadding: CGFloat) -> some View {
+      Text(label)
+        .font(.caption.monospaced().weight(.semibold))
+        .foregroundStyle(.white)
+        .padding(.horizontal, 10)
+        .padding(.vertical, verticalPadding)
+        .background(Color.black.opacity(0.78))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
   }
 #endif

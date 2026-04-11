@@ -21,60 +21,15 @@
 
     var body: some View {
       VStack(spacing: 8) {
-        HStack(spacing: 8) {
-          Button(action: onFirst) {
-            Label("First", systemImage: "backward.end.fill")
-          }
-          .disabled(!canGoToPreviousPage)
-
-          Button(action: onPrevious) {
-            Label("Prev", systemImage: "chevron.left")
-          }
-          .disabled(!canGoToPreviousPage)
-
-          Button(action: onNext) {
-            Label("Next", systemImage: "chevron.right")
-          }
-          .disabled(!canGoToNextPage)
-
-          Button(action: onLast) {
-            Label("Last", systemImage: "forward.end.fill")
-          }
-          .disabled(!canGoToNextPage)
-
-          Spacer()
-
-          TextField("Page", text: $pageInput)
-            .textFieldStyle(.roundedBorder)
-            .frame(width: 64)
-            .onSubmit {
-              onJumpToPage()
-            }
-
-          Button("Go", action: onJumpToPage)
-            .disabled(!canJumpToPage)
+        ViewThatFits(in: .horizontal) {
+          navigationRowRegular
+          navigationRowCompact
         }
         .buttonStyle(.bordered)
 
-        HStack(spacing: 12) {
-          Text(pageSummary)
-            .font(.footnote.monospacedDigit())
-
-          Spacer()
-
-          Toggle("Markup", isOn: $isInMarkupMode)
-            .toggleStyle(.switch)
-            .fixedSize()
-
-          Picker("Overlay", selection: $overlayMode) {
-            ForEach(PreviewOverlayMode.allCases) { mode in
-              Text(mode.rawValue).tag(mode)
-            }
-          }
-          .pickerStyle(.segmented)
-          .frame(maxWidth: 260)
-
-          Button("Reset Overlay", action: onResetOverlayTelemetry)
+        ViewThatFits(in: .horizontal) {
+          settingsRowRegular
+          settingsRowCompact
         }
         .font(.footnote)
 
@@ -101,6 +56,167 @@
       .padding(.horizontal)
       .padding(.top, 8)
       .padding(.bottom, 10)
+      .background(.ultraThinMaterial)
+    }
+
+    private var navigationRowRegular: some View {
+      HStack(spacing: 8) {
+        Button(action: onFirst) {
+          Label("First", systemImage: "backward.end.fill")
+        }
+        .disabled(!canGoToPreviousPage)
+
+        Button(action: onPrevious) {
+          Label("Prev", systemImage: "chevron.left")
+        }
+        .disabled(!canGoToPreviousPage)
+
+        Button(action: onNext) {
+          Label("Next", systemImage: "chevron.right")
+        }
+        .disabled(!canGoToNextPage)
+
+        Button(action: onLast) {
+          Label("Last", systemImage: "forward.end.fill")
+        }
+        .disabled(!canGoToNextPage)
+
+        Spacer()
+
+        pageJumpField
+      }
+    }
+
+    private var navigationRowCompact: some View {
+      HStack(spacing: 8) {
+        Button(action: onFirst) {
+          Label("First", systemImage: "backward.end.fill")
+        }
+        .labelStyle(.iconOnly)
+        .disabled(!canGoToPreviousPage)
+
+        Button(action: onPrevious) {
+          Label("Prev", systemImage: "chevron.left")
+        }
+        .labelStyle(.iconOnly)
+        .disabled(!canGoToPreviousPage)
+
+        Button(action: onNext) {
+          Label("Next", systemImage: "chevron.right")
+        }
+        .labelStyle(.iconOnly)
+        .disabled(!canGoToNextPage)
+
+        Button(action: onLast) {
+          Label("Last", systemImage: "forward.end.fill")
+        }
+        .labelStyle(.iconOnly)
+        .disabled(!canGoToNextPage)
+
+        Spacer()
+
+        pageJumpField
+      }
+    }
+
+    private var settingsRowRegular: some View {
+      HStack(spacing: 12) {
+        Text(pageSummary)
+          .font(.footnote.monospacedDigit())
+
+        Spacer()
+
+        Toggle("Markup", isOn: $isInMarkupMode)
+          .toggleStyle(.switch)
+          .fixedSize()
+
+        overlayModePicker
+
+        Button("Reset Overlay", action: onResetOverlayTelemetry)
+      }
+    }
+
+    private var settingsRowCompact: some View {
+      VStack(spacing: 8) {
+        HStack(spacing: 12) {
+          Text(pageSummary)
+            .font(.footnote.monospacedDigit())
+          Spacer()
+          Toggle("Markup", isOn: $isInMarkupMode)
+            .toggleStyle(.switch)
+            .fixedSize()
+        }
+
+        overlayModePicker
+
+        HStack {
+          Button("Reset Overlay", action: onResetOverlayTelemetry)
+          Spacer()
+        }
+      }
+    }
+
+    private var overlayModePicker: some View {
+      Picker("Overlay", selection: $overlayMode) {
+        ForEach(PreviewOverlayMode.allCases) { mode in
+          Text(mode.rawValue).tag(mode)
+        }
+      }
+      .pickerStyle(.segmented)
+      .frame(maxWidth: .infinity)
+    }
+
+    private var pageJumpField: some View {
+      HStack(spacing: 8) {
+        TextField("Page", text: $pageInput)
+          .textFieldStyle(.roundedBorder)
+          .frame(width: 64)
+          .onSubmit {
+            onJumpToPage()
+          }
+
+        Button("Go", action: onJumpToPage)
+          .disabled(!canJumpToPage)
+      }
+    }
+  }
+
+  @MainActor
+  struct PDFInteractivePreviewBottomToolbar: View {
+    @Binding var searchQuery: String
+    let searchResultCount: Int
+    let searchSummary: String
+    let canClearSearch: Bool
+    let onPreviousSearch: () -> Void
+    let onNextSearch: () -> Void
+    let onClearSearch: () -> Void
+
+    var body: some View {
+      VStack(spacing: 8) {
+        HStack(spacing: 8) {
+          TextField("Search in PDF", text: $searchQuery)
+            .textFieldStyle(.roundedBorder)
+
+          Button("Prev", action: onPreviousSearch)
+            .disabled(searchResultCount == 0)
+
+          Button("Next", action: onNextSearch)
+            .disabled(searchResultCount == 0)
+
+          Button("Clear", action: onClearSearch)
+            .disabled(!canClearSearch)
+        }
+        .buttonStyle(.bordered)
+
+        HStack {
+          Text(searchSummary)
+            .font(.footnote.monospacedDigit())
+            .foregroundStyle(.secondary)
+          Spacer()
+        }
+      }
+      .padding(.horizontal)
+      .padding(.vertical, 10)
       .background(.ultraThinMaterial)
     }
   }
