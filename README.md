@@ -7,7 +7,7 @@ Phase-1 focuses on a thin, reusable viewing foundation with clean seams for futu
 
 ## Current boundaries
 
-- `PDFDocumentSource`: document loading/input boundary (`PDFDocument`, `Data`, `URL`).
+- `PDFDocument.Representation`: document loading/input boundary (`PDFDocument`, `Data`, `URL`).
 - `PDFKit`: current fixed viewer backend (no alternate backend abstraction in this phase).
 - `PDFViewContainer`: SwiftUI host/container boundary (`PDFKit` bridge).
 - `.pdf.displayMode(_:)` / `.pdf.displayDirection(_:)` / `.pdf.autoScales(_:)` / `.pdf.isInMarkupMode(_:)`: viewer configuration boundary.
@@ -39,7 +39,7 @@ struct ReaderView: View {
     @State private var searchOptions: NSString.CompareOptions = [.caseInsensitive]
     @State private var searchResults: [PDFSearchHit] = []
 
-    let source: PDFDocumentSource
+    let source: PDFDocument.Representation
 
     var body: some View {
         PDF(source: source)

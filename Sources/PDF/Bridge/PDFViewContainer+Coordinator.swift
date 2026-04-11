@@ -15,7 +15,7 @@ extension PDFViewContainer {
     private var pageChangedObserver: NSObjectProtocol?
     private var scaleChangedObserver: NSObjectProtocol?
 
-    private let documentLoader = PDFDocumentLoader()
+    private let documentLoader = PDFDocument.Representation.Loader()
     private let pageBindingSynchronizer = PDFPageBindingSynchronizer()
     private let searchRuntime = PDFSearchRuntime()
     private let searchBindingSynchronizer = PDFSearchBindingSynchronizer()
@@ -26,7 +26,7 @@ extension PDFViewContainer {
 
     func bind(
       pdfView: PDFView,
-      source: PDFDocumentSource,
+      source: PDFDocument.Representation,
       pageBindings: PDFPageBindings,
       searchBindings: PDFSearchBindings
     ) {
@@ -37,7 +37,7 @@ extension PDFViewContainer {
         pageOverlayViewLifecycle.clearOverlayViews()
         self.pdfView = pdfView
         installObservers(for: pdfView)
-        documentLoader.resetLoadedSourceIdentity()
+        documentLoader.resetCachedIdentifier()
         pageBindingSynchronizer.reset()
         searchRuntime.reset()
         searchBindingSynchronizer.reset()
@@ -46,14 +46,14 @@ extension PDFViewContainer {
       self.pageBindings = pageBindings
       self.searchBindings = searchBindings
 
-      _ = loadSourceIfNeeded(source, forceReload: false)
+      _ = reloadDocumentIfNeeded(source)
 
       refreshPageBindings(applyExternalPage: true)
       refreshSearchBindings()
     }
 
-    func loadDocumentIfNeeded(_ source: PDFDocumentSource) {
-      _ = loadSourceIfNeeded(source, forceReload: false)
+    func loadDocumentIfNeeded(_ source: PDFDocument.Representation) {
+      _ = reloadDocumentIfNeeded(source)
       refreshPageBindings(applyExternalPage: true)
       refreshSearchBindings()
     }
@@ -67,7 +67,7 @@ extension PDFViewContainer {
       pageBindingSynchronizer.reset()
       searchRuntime.reset()
       searchBindingSynchronizer.reset()
-      documentLoader.resetLoadedSourceIdentity()
+      documentLoader.resetCachedIdentifier()
       pageOverlayViewLifecycle.clearOverlayViews()
     }
 
@@ -136,8 +136,11 @@ extension PDFViewContainer {
     }
 
     @discardableResult
-    private func loadSourceIfNeeded(_ source: PDFDocumentSource, forceReload: Bool = true) -> Bool {
-      let didLoad = documentLoader.load(source: source, forceReload: forceReload, into: pdfView)
+    private func reloadDocumentIfNeeded(_ source: PDFDocument.Representation) -> Bool {
+      let didLoad = documentLoader.load(
+        representation: source,
+        into: pdfView
+      )
       guard didLoad else {
         return false
       }

@@ -3,9 +3,9 @@ import SwiftUI
 
 @MainActor
 public struct PDF: View {
-  private let source: PDFDocumentSource
+  private let source: PDFDocument.Representation
 
-  public init(source: PDFDocumentSource) {
+  public init(source: PDFDocument.Representation) {
     self.source = source
   }
 

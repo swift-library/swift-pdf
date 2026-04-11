@@ -3,7 +3,7 @@ import SwiftUI
 
 @MainActor
 public struct PDFViewContainer {
-  private let source: PDFDocumentSource
+  private let source: PDFDocument.Representation
 
   @Environment(\.displayMode) private var displayMode
   @Environment(\.displayDirection) private var displayDirection
@@ -19,7 +19,7 @@ public struct PDFViewContainer {
   @Environment(\.pageOverlayContentProvider) private var overlayContentProvider
   @Environment(\.pageOverlayRelease) private var overlayRelease
 
-  public init(source: PDFDocumentSource) {
+  public init(source: PDFDocument.Representation) {
     self.source = source
   }
 

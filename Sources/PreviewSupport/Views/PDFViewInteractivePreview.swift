@@ -16,7 +16,7 @@
     @State private var isInMarkupMode: Bool = true
     @State private var overlayMode: PreviewOverlayMode = .interactive
 
-    let source: PDFDocumentSource
+    let source: PDFDocument.Representation
 
     private var currentPageNumber: Int {
       pageCount > 0 ? pageIndex + 1 : 0

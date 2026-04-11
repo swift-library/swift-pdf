@@ -26,7 +26,7 @@
     static func previewSource(
       named pdfName: String = defaultRootPDFName,
       filePath: StaticString = #filePath
-    ) -> PDFDocumentSource? {
+    ) -> PDFDocument.Representation? {
       if let fixtureURL = rootPDFURL(named: pdfName, filePath: filePath),
         let document = PDFDocument(url: fixtureURL)
       {

@@ -12,7 +12,7 @@ import Testing
 @Test
 func documentSourceDocumentCasePreservesObjectIdentity() {
   let document = PDFDocument()
-  let source = PDFDocumentSource.document(document)
+  let source = PDFDocument.Representation.document(document)
 
   #expect(source.resolveDocument() === document)
 }
@@ -20,7 +20,7 @@ func documentSourceDocumentCasePreservesObjectIdentity() {
 @Test
 func documentSourceDataCaseBuildsReadableDocument() throws {
   let fixtureData = try Data(contentsOf: fixturePDFURL())
-  let source = PDFDocumentSource.data(fixtureData)
+  let source = PDFDocument.Representation.data(fixtureData)
 
   let document = try #require(source.resolveDocument())
   #expect(document.pageCount > 0)
@@ -28,10 +28,25 @@ func documentSourceDataCaseBuildsReadableDocument() throws {
 
 @Test
 func documentSourceFileURLCaseBuildsReadableDocument() throws {
-  let source = PDFDocumentSource.fileURL(try fixturePDFURL())
+  let source = PDFDocument.Representation.fileURL(try fixturePDFURL())
 
   let document = try #require(source.resolveDocument())
   #expect(document.pageCount > 0)
+}
+
+@Test
+@MainActor
+func repeatedLoadWithSameDataSourceDoesNotRemountDocument() throws {
+  let fixtureData = try Data(contentsOf: fixturePDFURL())
+  let source = PDFDocument.Representation.data(fixtureData)
+  let loader = PDFDocument.Representation.Loader()
+  let pdfView = PDFView()
+
+  #expect(loader.load(representation: source, into: pdfView))
+  let firstDocument = try #require(pdfView.document)
+
+  #expect(loader.load(representation: source, into: pdfView) == false)
+  #expect(pdfView.document === firstDocument)
 }
 
 @Test
@@ -654,6 +669,50 @@ func pageChangesDoNotResetSearchBindings() throws {
 
 @Test
 @MainActor
+func rebindingWithUpdatedSourceLoadsLatestDocument() throws {
+  let populatedDocument = try #require(PDFDocument(url: fixturePDFURL()))
+  let emptyDocument = PDFDocument()
+
+  let coordinator = PDFViewContainer.Coordinator()
+  let pdfView = PDFView()
+
+  let pageIndexBox = IntBindingBox(0)
+  let pageCountBox = IntBindingBox(0)
+  let queryBox = StringBindingBox("the")
+  let selectionBox = OptionalIntBindingBox(nil)
+  let resultCountBox = IntBindingBox(0)
+
+  bindCoordinator(coordinator,
+    pdfView: pdfView,
+    initialSource: .document(populatedDocument),
+    pageIndexBinding: makeBinding(for: pageIndexBox),
+    pageCountBinding: makeBinding(for: pageCountBox),
+    searchQueryBinding: makeBinding(for: queryBox),
+    searchSelectionBinding: makeBinding(for: selectionBox),
+    searchResultCountBinding: makeBinding(for: resultCountBox)
+  )
+  #expect(resultCountBox.value > 0)
+  #expect(pageCountBox.value == populatedDocument.pageCount)
+
+  bindCoordinator(coordinator,
+    pdfView: pdfView,
+    initialSource: .document(emptyDocument),
+    pageIndexBinding: makeBinding(for: pageIndexBox),
+    pageCountBinding: makeBinding(for: pageCountBox),
+    searchQueryBinding: makeBinding(for: queryBox),
+    searchSelectionBinding: makeBinding(for: selectionBox),
+    searchResultCountBinding: makeBinding(for: resultCountBox)
+  )
+
+  #expect(pdfView.document === emptyDocument)
+  #expect(pageCountBox.value == 0)
+  #expect(pageIndexBox.value == 0)
+  #expect(resultCountBox.value == 0)
+  #expect(selectionBox.value == nil)
+}
+
+@Test
+@MainActor
 func repeatedLoadWithSameDocumentDoesNotThrashSearchBindings() throws {
   let document = try #require(PDFDocument(url: fixturePDFURL()))
   let emptyDocument = PDFDocument()
@@ -1011,7 +1070,7 @@ func pdfNamespaceModifierSurfaceCompiles() {
 private func bindCoordinator(
   _ coordinator: PDFViewContainer.Coordinator,
   pdfView: PDFView,
-  initialSource: PDFDocumentSource,
+  initialSource: PDFDocument.Representation,
   pageIndexBinding: Binding<Int>?,
   pageCountBinding: Binding<Int>?,
   searchQueryBinding: Binding<String>? = nil,
@@ -1022,7 +1081,7 @@ private func bindCoordinator(
 ) {
   coordinator.bind(
     pdfView: pdfView,
-    initialSource: initialSource,
+    source: initialSource,
     pageBindings: PDFPageBindings(
       pageIndex: pageIndexBinding,
       pageCount: pageCountBinding
