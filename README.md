@@ -37,7 +37,7 @@ struct ReaderView: View {
     @State private var searchSelection: Int? = nil
     @State private var searchResultCount = 0
     @State private var searchOptions: NSString.CompareOptions = [.caseInsensitive]
-    @State private var searchResults: [PDFSearchHit] = []
+    @State private var searchResults: [PDFSearchResult] = []
 
     let source: PDFDocument.Representation
 

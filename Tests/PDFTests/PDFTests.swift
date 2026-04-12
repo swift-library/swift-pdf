@@ -613,7 +613,7 @@ func documentLoadPublishesPageBindingsBeforeSearchBindings() throws {
   var selectionValue: Int? = nil
   var resultCountValue = 0
   var optionsValue: NSString.CompareOptions = [.caseInsensitive]
-  var resultsValue: [PDFSearchHit] = []
+  var resultsValue: [PDFSearchResult] = []
   var events: [String] = []
 
   let pageIndexBinding = Binding(
@@ -680,6 +680,90 @@ func documentLoadPublishesPageBindingsBeforeSearchBindings() throws {
   #expect(events[..<firstSearchEventIndex].contains("pageCount"))
   #expect(resultCountValue > 0)
   #expect(selectionValue != nil)
+}
+
+@Test
+@MainActor
+func searchBindingPublicationDedupesWhenStateIsUnchanged() throws {
+  let document = try #require(PDFDocument(url: fixturePDFURL()))
+
+  let coordinator = PDFViewContainer.Coordinator()
+  let pdfView = PDFView()
+
+  var queryValue = "the"
+  var selectionValue: Int? = nil
+  var resultCountValue = 0
+  var optionsValue: NSString.CompareOptions = [.caseInsensitive]
+  var resultsValue: [PDFSearchResult] = []
+
+  var selectionSetCount = 0
+  var resultCountSetCount = 0
+  var resultsSetCount = 0
+
+  let queryBinding = Binding(
+    get: { queryValue },
+    set: { queryValue = $0 }
+  )
+  let selectionBinding = Binding(
+    get: { selectionValue },
+    set: {
+      selectionValue = $0
+      selectionSetCount += 1
+    }
+  )
+  let resultCountBinding = Binding(
+    get: { resultCountValue },
+    set: {
+      resultCountValue = $0
+      resultCountSetCount += 1
+    }
+  )
+  let optionsBinding = Binding(
+    get: { optionsValue },
+    set: { optionsValue = $0 }
+  )
+  let resultsBinding = Binding(
+    get: { resultsValue },
+    set: {
+      resultsValue = $0
+      resultsSetCount += 1
+    }
+  )
+
+  bindCoordinator(
+    coordinator,
+    pdfView: pdfView,
+    initialSource: .document(document),
+    pageIndexBinding: nil,
+    pageCountBinding: nil,
+    searchQueryBinding: queryBinding,
+    searchSelectionBinding: selectionBinding,
+    searchResultCountBinding: resultCountBinding,
+    searchOptionsBinding: optionsBinding,
+    searchResultsBinding: resultsBinding
+  )
+
+  #expect(resultCountValue > 0)
+  let selectionSetCountAfterFirstBind = selectionSetCount
+  let resultCountSetCountAfterFirstBind = resultCountSetCount
+  let resultsSetCountAfterFirstBind = resultsSetCount
+
+  bindCoordinator(
+    coordinator,
+    pdfView: pdfView,
+    initialSource: .document(document),
+    pageIndexBinding: nil,
+    pageCountBinding: nil,
+    searchQueryBinding: queryBinding,
+    searchSelectionBinding: selectionBinding,
+    searchResultCountBinding: resultCountBinding,
+    searchOptionsBinding: optionsBinding,
+    searchResultsBinding: resultsBinding
+  )
+
+  #expect(selectionSetCount == selectionSetCountAfterFirstBind)
+  #expect(resultCountSetCount == resultCountSetCountAfterFirstBind)
+  #expect(resultsSetCount == resultsSetCountAfterFirstBind)
 }
 
 @Test
@@ -1051,7 +1135,7 @@ func primaryViewAndModifierSurfaceCompiles() {
     @State private var searchSelection: Int? = nil
     @State private var searchResultCount: Int = 0
     @State private var searchOptions: NSString.CompareOptions = [.caseInsensitive]
-    @State private var searchResults: [PDFSearchHit] = []
+    @State private var searchResults: [PDFSearchResult] = []
 
     var body: some View {
       PDF(document: PDFDocument())
@@ -1098,7 +1182,7 @@ func pdfNamespaceModifierSurfaceCompiles() {
     @State private var searchSelection: Int? = nil
     @State private var searchResultCount: Int = 0
     @State private var searchOptions: NSString.CompareOptions = [.caseInsensitive]
-    @State private var searchResults: [PDFSearchHit] = []
+    @State private var searchResults: [PDFSearchResult] = []
 
     var body: some View {
       VStack {
@@ -1136,7 +1220,7 @@ private func bindCoordinator(
   searchSelectionBinding: Binding<Int?>? = nil,
   searchResultCountBinding: Binding<Int>? = nil,
   searchOptionsBinding: Binding<NSString.CompareOptions>? = nil,
-  searchResultsBinding: Binding<[PDFSearchHit]>? = nil
+  searchResultsBinding: Binding<[PDFSearchResult]>? = nil
 ) {
   coordinator.bind(
     pdfView: pdfView,
@@ -1216,9 +1300,9 @@ private final class SearchOptionsBindingBox {
 
 @MainActor
 private final class SearchResultsBindingBox {
-  var value: [PDFSearchHit]
+  var value: [PDFSearchResult]
 
-  init(_ value: [PDFSearchHit]) {
+  init(_ value: [PDFSearchResult]) {
     self.value = value
   }
 }
@@ -1267,7 +1351,7 @@ private func makeBinding(for box: SearchOptionsBindingBox) -> Binding<NSString.C
 }
 
 @MainActor
-private func makeBinding(for box: SearchResultsBindingBox) -> Binding<[PDFSearchHit]> {
+private func makeBinding(for box: SearchResultsBindingBox) -> Binding<[PDFSearchResult]> {
   Binding(
     get: { box.value },
     set: { box.value = $0 }
@@ -1284,12 +1368,7 @@ private func currentPageIndex(in pdfView: PDFView) -> Int {
 }
 
 private func fixturePDFURL() throws -> URL {
-  let repositoryRoot = try repositoryRootURL()
-  let fixtureURL = repositoryRoot
-    .appendingPathComponent("Tests")
-    .appendingPathComponent("PDFTests")
-    .appendingPathComponent("Fixtures")
-    .appendingPathComponent("drawingwithquartz2d.pdf")
+  let fixtureURL = try sourceFileURL("Tests/PDFTests/Fixtures/drawingwithquartz2d.pdf")
 
   guard FileManager.default.fileExists(atPath: fixtureURL.path) else {
     throw NSError(
@@ -1300,6 +1379,10 @@ private func fixturePDFURL() throws -> URL {
   }
 
   return fixtureURL
+}
+
+private func sourceFileURL(_ relativePath: String) throws -> URL {
+  try repositoryRootURL().appendingPathComponent(relativePath)
 }
 
 private func repositoryRootURL() throws -> URL {

@@ -17,8 +17,8 @@ extension PDFViewContainer {
     private var observerPublishers = Set<AnyCancellable>()
 
     private let documentLoader = PDFDocument.Representation.Loader()
-    private let searchRuntime = PDFSearchRuntime()
-    private let searchBindingSynchronizer = PDFSearchBindingSynchronizer()
+    private var searchEngine = PDFSearchEngine(document: PDFDocument())
+    private let searchBindingDriver = PDFSearchBindingDriver()
     private let pageOverlayViewLifecycle = PDFPageOverlayViewLifecycle()
 
     private var pageBindings = PDFPageBindings()
@@ -38,8 +38,7 @@ extension PDFViewContainer {
         self.pdfView = pdfView
         installPublishers(for: pdfView)
         documentLoader.resetCachedIdentifier()
-        searchRuntime.reset()
-        searchBindingSynchronizer.reset()
+        searchEngine = PDFSearchEngine(document: pdfView.document ?? PDFDocument())
       }
 
       self.pageBindings = pageBindings
@@ -63,8 +62,7 @@ extension PDFViewContainer {
       pdfView = nil
       pageBindings = PDFPageBindings()
       searchBindings = PDFSearchBindings()
-      searchRuntime.reset()
-      searchBindingSynchronizer.reset()
+      searchEngine = PDFSearchEngine(document: PDFDocument())
       documentLoader.resetCachedIdentifier()
       pageOverlayViewLifecycle.clearOverlayViews()
     }
@@ -131,7 +129,7 @@ extension PDFViewContainer {
         return false
       }
 
-      searchRuntime.markDocumentChanged()
+      searchEngine = PDFSearchEngine(document: pdfView?.document ?? PDFDocument())
       return true
     }
 
@@ -158,20 +156,23 @@ extension PDFViewContainer {
     }
 
     private func refreshSearchBindings() {
-      searchBindingSynchronizer.sync(
-        on: pdfView,
-        runtime: searchRuntime,
-        queryBinding: searchBindings.query,
-        selectionBinding: searchBindings.selection,
-        resultCountBinding: searchBindings.resultCount,
-        optionsBinding: searchBindings.options,
-        resultsBinding: searchBindings.results,
-        navigateToSearchMatch: { [weak self] target in
-          if let target {
-            self?.pdfView?.go(to: target)
-          }
-        }
+      let searchDecision = searchBindingDriver.performFind(
+        engine: searchEngine,
+        searchBindings: searchBindings
       )
+
+      switch searchDecision {
+      case .publish:
+        break
+      case .clearSelection:
+        pdfView?.setCurrentSelection(nil, animate: false)
+      case .focus(let selection, _):
+        guard let pdfView else {
+          break
+        }
+        pdfView.setCurrentSelection(selection, animate: true)
+        pdfView.go(to: selection)
+      }
     }
   }
 }

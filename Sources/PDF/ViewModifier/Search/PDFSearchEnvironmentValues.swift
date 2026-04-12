@@ -15,5 +15,5 @@ extension EnvironmentValues {
   var searchOptionsBinding: Binding<NSString.CompareOptions>? = nil
 
   @Entry
-  var searchResultsBinding: Binding<[PDFSearchHit]>? = nil
+  var searchResultsBinding: Binding<[PDFSearchResult]>? = nil
 }

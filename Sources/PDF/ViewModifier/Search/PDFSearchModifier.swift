@@ -19,7 +19,7 @@ extension PDFViewBase where Base: View {
     base.environment(\.searchOptionsBinding, options)
   }
 
-  public func searchResults(_ results: Binding<[PDFSearchHit]>) -> some View {
+  public func searchResults(_ results: Binding<[PDFSearchResult]>) -> some View {
     base.environment(\.searchResultsBinding, results)
   }
 }
