@@ -105,6 +105,11 @@ State and command semantics are intentionally split:
 - `currentPage`, `pageCount`, and `scaleFactor` publish settled `PDFView` state.
 - Writing those bindings from the outside is not a navigation API.
 
+Additional currently exported proxy commands:
+
+- `goToPage(at:)` and `goToSelection(_:)` for explicit page/selection targeting.
+- `setScaleFactor(_:)`, `zoomIn()`, and `zoomOut()` for view-scale control.
+
 ## Search state and commands
 
 Bind query and settled search state directly. Query changes refresh search results, but they do not navigate automatically:
@@ -137,6 +142,7 @@ If `.pdf.searchOptions(_:)` is not bound, search runs with `[]`.
 As with page navigation, proxy search commands and published search state are separate:
 
 - `PDFViewProxy.goToSearchResult(at:)` / `goToNextSearchResult()` / `goToPreviousSearchResult()` are commands.
+- `PDFViewProxy.clearSelection()` clears the current viewer selection and focused search-result index without recomputing results.
 - `searchResultIndex`, `searchResultCount`, and `searchResults` are settled state outputs.
 
 ## Overlay hooks
@@ -168,13 +174,19 @@ Overlay behavior is explicit by platform:
 
 Detailed current API-to-PDFKit mapping is documented in
 
+## Exported Supporting Types
+
+- `PDFSearchResult`: settled search output model used by `.pdf.searchResults(_:)`.
+- `PDFPageMargins`: exported configuration value type currently available at the package surface, but not yet consumed by the phase-1 modifier surface.
+
 ## Preview Fixture Policy
 
 - Preview implementation code lives under `Sources/PDF/Preview` and is compile-gated by `PDF_INTERNAL_PREVIEW`.
 - Shared preview/test fixture lives at `Tests/PDFTests/Fixtures/drawingwithquartz2d.pdf`.
 - Previews resolve fixture files from the repository file system path, not from `Bundle.module`.
 - `PDF` target does not declare `.process` / `.copy` resources for these files, so they are not packaged as SwiftPM target resources.
-- To enable previews locally, add `PDF_INTERNAL_PREVIEW` to Swift compiler conditions
+- Debug builds define `PDF_INTERNAL_PREVIEW` automatically via `Package.swift`.
+- For custom/non-debug invocations, you can still opt in manually
   (for example: `swift build -Xswiftc -DPDF_INTERNAL_PREVIEW`).
 
 ## Scope notes

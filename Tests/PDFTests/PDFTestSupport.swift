@@ -221,9 +221,15 @@ class PDFKitSuite {
 
 @MainActor
 final class TrackingNavigationPDFView: PDFView {
+  var goToPageCallCount = 0
   var goToNextPageCallCount = 0
   var goToPreviousPageCallCount = 0
   var goToDestinationCallCount = 0
+
+  override func go(to page: PDFPage) {
+    goToPageCallCount += 1
+    super.go(to: page)
+  }
 
   override func goToNextPage(_ sender: Any?) {
     goToNextPageCallCount += 1

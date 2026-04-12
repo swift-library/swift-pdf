@@ -75,7 +75,7 @@ extension PDFTests {
     }
 
     @Test
-    func adjacentPageCommandsPreferStepNavigationWithDestinationFallback() throws {
+    func goToPageUsesDirectPageTargetDispatch() throws {
       let document = try #require(PDFDocument(url: fixturePDFURL()))
       #expect(document.pageCount > 2)
 
@@ -97,18 +97,21 @@ extension PDFTests {
 
       proxy.goToPage(at: 1)
 
-      #expect(pdfView.goToNextPageCallCount == 1)
+      #expect(pdfView.goToPageCallCount == 1)
       #expect(pdfView.goToPreviousPageCallCount == 0)
       #expect(pdfView.goToDestinationCallCount == 0)
+      #expect(pdfView.goToNextPageCallCount == 0)
 
       proxy.goToPage(at: 0)
 
-      #expect(pdfView.goToPreviousPageCallCount == 1)
+      #expect(pdfView.goToPageCallCount == 2)
       #expect(pdfView.goToDestinationCallCount == 0)
+      #expect(pdfView.goToPreviousPageCallCount == 0)
 
       proxy.goToPage(at: 2)
 
-      #expect(pdfView.goToDestinationCallCount == 1)
+      #expect(pdfView.goToPageCallCount == 3)
+      #expect(pdfView.goToDestinationCallCount == 0)
     }
 
     @Test
