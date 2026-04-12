@@ -1,12 +1,13 @@
 import PDFKit
+
 #if canImport(AppKit)
   import AppKit
 #elseif canImport(UIKit)
   import UIKit
 #endif
 
-private extension Int {
-  func clamped(to pageCount: Int) -> Int {
+extension Int {
+  fileprivate func clamped(to pageCount: Int) -> Int {
     guard pageCount > 0 else {
       return 0
     }

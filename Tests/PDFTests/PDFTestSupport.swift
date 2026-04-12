@@ -2,11 +2,11 @@ import Foundation
 import PDFKit
 import SwiftUI
 
+@testable import PDF
+
 #if canImport(AppKit)
   import AppKit
 #endif
-
-@testable import PDF
 
 @MainActor
 func bindCoordinator(
@@ -271,7 +271,8 @@ func fixturePDFURL() throws -> URL {
 
 func repositoryRootURL() throws -> URL {
   let testFileURL = URL(fileURLWithPath: #filePath)
-  let repositoryRoot = testFileURL
+  let repositoryRoot =
+    testFileURL
     .deletingLastPathComponent()
     .deletingLastPathComponent()
     .deletingLastPathComponent()

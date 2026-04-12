@@ -25,7 +25,8 @@ extension PDFTests {
       let optionsBox = SearchOptionsBindingBox([.caseInsensitive])
       let resultsBox = SearchResultsBindingBox([])
 
-      bindCoordinator(coordinator,
+      bindCoordinator(
+        coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
         currentPageBinding: makeBinding(for: currentPageBox),
@@ -66,7 +67,8 @@ extension PDFTests {
       let optionsBox = SearchOptionsBindingBox([.caseInsensitive])
       let resultsBox = SearchResultsBindingBox([])
 
-      bindCoordinator(coordinator,
+      bindCoordinator(
+        coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
         currentPageBinding: makeBinding(for: currentPageBox),
@@ -112,7 +114,8 @@ extension PDFTests {
       let optionsBox = SearchOptionsBindingBox([.caseInsensitive])
       let resultsBox = SearchResultsBindingBox([])
 
-      bindCoordinator(coordinator,
+      bindCoordinator(
+        coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
         currentPageBinding: nil,
@@ -129,7 +132,8 @@ extension PDFTests {
       #expect(resultsBox.value.count == resultCountBox.value)
 
       optionsBox.value = []
-      bindCoordinator(coordinator,
+      bindCoordinator(
+        coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
         currentPageBinding: nil,
@@ -160,7 +164,8 @@ extension PDFTests {
       let optionsBox = SearchOptionsBindingBox([.caseInsensitive])
       let resultsBox = SearchResultsBindingBox([])
 
-      bindCoordinator(coordinator,
+      bindCoordinator(
+        coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
         currentPageBinding: nil,
@@ -174,7 +179,8 @@ extension PDFTests {
       await flushMainActorTasks()
 
       queryBox.value = ""
-      bindCoordinator(coordinator,
+      bindCoordinator(
+        coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
         currentPageBinding: nil,
@@ -291,7 +297,8 @@ extension PDFTests {
       let searchResultIndexBox = OptionalIntBindingBox(nil)
       let resultCountBox = IntBindingBox(0)
 
-      bindCoordinator(coordinator,
+      bindCoordinator(
+        coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
         currentPageBinding: makeBinding(for: currentPageBox),
@@ -308,7 +315,8 @@ extension PDFTests {
 
       pdfView.goToNextPage(nil)
       NotificationCenter.default.post(name: .PDFViewPageChanged, object: pdfView)
-      bindCoordinator(coordinator,
+      bindCoordinator(
+        coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
         currentPageBinding: makeBinding(for: currentPageBox),

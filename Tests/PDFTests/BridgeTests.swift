@@ -20,14 +20,16 @@ extension PDFTests {
       let currentPageBox = TrackingIntBindingBox(0)
       let pageCountBox = IntBindingBox(0)
 
-      bindCoordinator(coordinator,
+      bindCoordinator(
+        coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
         currentPageBinding: makeBinding(for: currentPageBox),
         pageCountBinding: makeBinding(for: pageCountBox)
       )
 
-      bindCoordinator(coordinator,
+      bindCoordinator(
+        coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
         currentPageBinding: makeBinding(for: currentPageBox),
@@ -57,7 +59,8 @@ extension PDFTests {
       let pageCountBox = IntBindingBox(0)
       let scaleFactorBox = IntBindingBox(0)
 
-      bindCoordinator(coordinator,
+      bindCoordinator(
+        coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
         currentPageBinding: makeBinding(for: currentPageBox),
@@ -105,7 +108,8 @@ extension PDFTests {
       let optionsBox = SearchOptionsBindingBox([.caseInsensitive])
       let resultsBox = SearchResultsBindingBox([])
 
-      bindCoordinator(coordinator,
+      bindCoordinator(
+        coordinator,
         pdfView: pdfView,
         initialSource: .document(populatedDocument),
         currentPageBinding: makeBinding(for: currentPageBox),
@@ -123,7 +127,8 @@ extension PDFTests {
       #expect(searchResultIndexBox.value == nil)
 
       pdfView.document = emptyDocument
-      bindCoordinator(coordinator,
+      bindCoordinator(
+        coordinator,
         pdfView: pdfView,
         initialSource: .document(populatedDocument),
         currentPageBinding: makeBinding(for: currentPageBox),
@@ -205,7 +210,8 @@ extension PDFTests {
         }
       )
 
-      bindCoordinator(coordinator,
+      bindCoordinator(
+        coordinator,
         pdfView: pdfView,
         initialSource: .document(emptyDocument),
         currentPageBinding: currentPageBinding,
@@ -218,7 +224,8 @@ extension PDFTests {
       )
 
       events.removeAll()
-      bindCoordinator(coordinator,
+      bindCoordinator(
+        coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
         currentPageBinding: currentPageBinding,
@@ -302,7 +309,8 @@ extension PDFTests {
         }
       )
 
-      bindCoordinator(coordinator,
+      bindCoordinator(
+        coordinator,
         pdfView: pdfView,
         initialSource: .document(populatedDocument),
         currentPageBinding: currentPageBinding,
@@ -334,7 +342,8 @@ extension PDFTests {
       drainRunLoop()
 
       events.removeAll()
-      bindCoordinator(coordinator,
+      bindCoordinator(
+        coordinator,
         pdfView: pdfView,
         initialSource: .document(emptyDocument),
         currentPageBinding: currentPageBinding,

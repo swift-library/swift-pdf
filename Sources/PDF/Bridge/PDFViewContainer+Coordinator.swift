@@ -173,10 +173,12 @@ extension PDFViewContainer {
         return
       }
 
-      guard searchEngine.performFind(
-        query: searchBindings.query?.wrappedValue ?? "",
-        options: searchBindings.options?.wrappedValue ?? []
-      ) else {
+      guard
+        searchEngine.performFind(
+          query: searchBindings.query?.wrappedValue ?? "",
+          options: searchBindings.options?.wrappedValue ?? []
+        )
+      else {
         return
       }
 

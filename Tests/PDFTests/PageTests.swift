@@ -19,7 +19,8 @@ extension PDFTests {
       let currentPageBox = IntBindingBox(0)
       let pageCountBox = IntBindingBox(0)
 
-      bindCoordinator(coordinator,
+      bindCoordinator(
+        coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
         currentPageBinding: makeBinding(for: currentPageBox),
@@ -56,7 +57,8 @@ extension PDFTests {
       let currentPageBox = IntBindingBox(0)
       let pageCountBox = IntBindingBox(0)
 
-      bindCoordinator(coordinator,
+      bindCoordinator(
+        coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
         currentPageBinding: makeBinding(for: currentPageBox),
@@ -84,7 +86,8 @@ extension PDFTests {
       let currentPageBox = IntBindingBox(0)
       let pageCountBox = IntBindingBox(0)
 
-      bindCoordinator(coordinator,
+      bindCoordinator(
+        coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
         currentPageBinding: makeBinding(for: currentPageBox),
@@ -119,7 +122,8 @@ extension PDFTests {
       let currentPageBox = IntBindingBox(0)
       let pageCountBox = IntBindingBox(0)
 
-      bindCoordinator(coordinator,
+      bindCoordinator(
+        coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
         currentPageBinding: makeBinding(for: currentPageBox),
@@ -127,7 +131,8 @@ extension PDFTests {
       )
 
       currentPageBox.value = 2
-      bindCoordinator(coordinator,
+      bindCoordinator(
+        coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
         currentPageBinding: makeBinding(for: currentPageBox),

@@ -1,8 +1,8 @@
 import PDFKit
 import SwiftUI
 
-private extension CGFloat {
-  func clamped(to range: ClosedRange<CGFloat>) -> CGFloat {
+extension CGFloat {
+  fileprivate func clamped(to range: ClosedRange<CGFloat>) -> CGFloat {
     Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
   }
 }

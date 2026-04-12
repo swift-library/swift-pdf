@@ -17,9 +17,10 @@ final class PDFSearchEngine {
     let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
     let pageCount = document.pageCount
 
-    guard normalizedQuery != state.query
-      || options != state.options
-      || pageCount != state.pageCount
+    guard
+      normalizedQuery != state.query
+        || options != state.options
+        || pageCount != state.pageCount
     else {
       return false
     }
@@ -74,7 +75,8 @@ final class PDFSearchEngine {
       return nil
     }
 
-    let nextIndex = ((state.searchResultIndex ?? -1) + 1 + state.selections.count)
+    let nextIndex =
+      ((state.searchResultIndex ?? -1) + 1 + state.selections.count)
       % state.selections.count
     return goToSearchResult(at: nextIndex)
   }
@@ -84,7 +86,8 @@ final class PDFSearchEngine {
       return nil
     }
 
-    let previousIndex = ((state.searchResultIndex ?? 0) - 1 + state.selections.count)
+    let previousIndex =
+      ((state.searchResultIndex ?? 0) - 1 + state.selections.count)
       % state.selections.count
     return goToSearchResult(at: previousIndex)
   }
