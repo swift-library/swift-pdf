@@ -205,5 +205,4 @@ Detailed current API-to-PDFKit mapping is documented in
 
 - Local commit hook path: `.githooks`
 - Commit policy CI workflow: `.github/workflows/commit-message.yml`
-- Contributor policy: see `CONTRIBUTING.md`.
 - Repository type: `swift-package`.
