@@ -12,7 +12,7 @@ Phase-1 focuses on a thin, reusable viewing foundation with clean seams for futu
 - `PDFViewContainer`: SwiftUI host/container boundary (`PDFKit` bridge).
 - `PDFViewReader` + `PDFViewProxy`: command boundary for viewer/session-scoped imperative actions.
 - `.pdf.displayMode(_:)` / `.pdf.displayDirection(_:)` / `.pdf.autoScales(_:)` / `.pdf.isInMarkupMode(_:)`: viewer configuration boundary.
-- `.pdf.currentPage(_:)` + `.pdf.pageCount(_:)` + `.pdf.scaleFactor(_:)`: settled viewer state boundary.
+- `.pdf.currentPage(_:)` + `.pdf.pageCount(_:)` + `.pdf.scaleFactor(_:)`: settled viewer state boundary. These bindings reflect `PDFView`'s actual settled state, not command echo.
 - `.pdf.searchQuery(_:)` + `.pdf.searchResultIndex(_:)` + `.pdf.searchResultCount(_:)` + `.pdf.searchOptions(_:)` + `.pdf.searchResults(_:)`: search input/state boundary, with search options bound as official `NSString.CompareOptions`.
 - `.pdf.overlay(_:)`: per-page SwiftUI overlay hook boundary.
 
@@ -27,44 +27,44 @@ import PDF
 ## Basic usage
 
 ```swift
+import PDF
 import PDFKit
 import SwiftUI
-import PDF
 
 struct ReaderView: View {
-    @State private var currentPage = 0
-    @State private var pageCount = 0
-    @State private var scaleFactor: CGFloat = 1
-    @State private var searchQuery = ""
-    @State private var searchResultIndex: Int? = nil
-    @State private var searchResultCount = 0
-    @State private var searchOptions: NSString.CompareOptions = [.caseInsensitive]
-    @State private var searchResults: [PDFSearchResult] = []
+  @State private var currentPage = 0
+  @State private var pageCount = 0
+  @State private var scaleFactor: CGFloat = 1
+  @State private var searchQuery = ""
+  @State private var searchResultIndex: Int? = nil
+  @State private var searchResultCount = 0
+  @State private var searchOptions: NSString.CompareOptions = [.caseInsensitive]
+  @State private var searchResults: [PDFSearchResult] = []
 
-    let source: PDFDocument.Representation
+  let source: PDFDocument.Representation
 
-    var body: some View {
-        PDFViewReader { proxy in
-            VStack {
-                PDF(source: source)
-                    .pdf.displayMode(.singlePageContinuous)
-                    .pdf.displayDirection(.vertical)
-                    .pdf.autoScales(true)
-                    .pdf.currentPage($currentPage)
-                    .pdf.pageCount($pageCount)
-                    .pdf.scaleFactor($scaleFactor)
-                    .pdf.searchQuery($searchQuery)
-                    .pdf.searchResultIndex($searchResultIndex)
-                    .pdf.searchResultCount($searchResultCount)
-                    .pdf.searchOptions($searchOptions)
-                    .pdf.searchResults($searchResults)
+  var body: some View {
+    PDFViewReader { proxy in
+      VStack {
+        PDF(source: source)
+          .pdf.displayMode(.singlePageContinuous)
+          .pdf.displayDirection(.vertical)
+          .pdf.autoScales(true)
+          .pdf.currentPage($currentPage)
+          .pdf.pageCount($pageCount)
+          .pdf.scaleFactor($scaleFactor)
+          .pdf.searchQuery($searchQuery)
+          .pdf.searchResultIndex($searchResultIndex)
+          .pdf.searchResultCount($searchResultCount)
+          .pdf.searchOptions($searchOptions)
+          .pdf.searchResults($searchResults)
 
-                Button("Next") {
-                    proxy.goToNextPage()
-                }
-            }
+        Button("Next") {
+          proxy.goToNextPage()
         }
+      }
     }
+  }
 }
 ```
 
@@ -72,8 +72,8 @@ For subtree-wide defaults (multiple viewers), you can also use namespace modifie
 
 ```swift
 VStack {
-    PDF(source: sourceA)
-    PDF(source: sourceB)
+  PDF(source: sourceA)
+  PDF(source: sourceB)
 }
 .pdf.displayMode(.singlePageContinuous)
 .pdf.displayDirection(.vertical)
@@ -86,18 +86,24 @@ External controls send commands through `PDFViewProxy`. `PDF` publishes settled 
 
 ```swift
 PDFViewReader { proxy in
-    PDF(source: source)
-        .pdf.currentPage($currentPage)
-        .pdf.pageCount($pageCount)
+  PDF(source: source)
+    .pdf.currentPage($currentPage)
+    .pdf.pageCount($pageCount)
 
-    Button("First") { proxy.goToFirstPage() }
-    Button("Prev") { proxy.goToPreviousPage() }
-    Button("Next") { proxy.goToNextPage() }
-    Button("Last") { proxy.goToLastPage() }
+  Button("First") { proxy.goToFirstPage() }
+  Button("Prev") { proxy.goToPreviousPage() }
+  Button("Next") { proxy.goToNextPage() }
+  Button("Last") { proxy.goToLastPage() }
 }
 ```
 
 `PDFViewReader` currently supports one descendant `PDF` viewer per reader scope.
+
+State and command semantics are intentionally split:
+
+- `PDFViewProxy` sends imperative navigation commands.
+- `currentPage`, `pageCount`, and `scaleFactor` publish settled `PDFView` state.
+- Writing those bindings from the outside is not a navigation API.
 
 ## Search state and commands
 
@@ -107,14 +113,14 @@ Bind query and settled search state directly. Query changes refresh search resul
 TextField("Search", text: $searchQuery)
 
 PDFViewReader { proxy in
-    PDF(source: source)
-        .pdf.searchQuery($searchQuery)
-        .pdf.searchResultIndex($searchResultIndex)
-        .pdf.searchResultCount($searchResultCount)
-        .pdf.searchResults($searchResults)
+  PDF(source: source)
+    .pdf.searchQuery($searchQuery)
+    .pdf.searchResultIndex($searchResultIndex)
+    .pdf.searchResultCount($searchResultCount)
+    .pdf.searchResults($searchResults)
 
-    Button("Prev") { proxy.goToPreviousSearchResult() }
-    Button("Next") { proxy.goToNextSearchResult() }
+  Button("Prev") { proxy.goToPreviousSearchResult() }
+  Button("Next") { proxy.goToNextSearchResult() }
 }
 ```
 
@@ -128,24 +134,29 @@ searchOptions = []
 
 If `.pdf.searchOptions(_:)` is not bound, search runs with `[]`.
 
+As with page navigation, proxy search commands and published search state are separate:
+
+- `PDFViewProxy.goToSearchResult(at:)` / `goToNextSearchResult()` / `goToPreviousSearchResult()` are commands.
+- `searchResultIndex`, `searchResultCount`, and `searchResults` are settled state outputs.
+
 ## Overlay hooks
 
 Attach a per-page SwiftUI overlay:
 
 ```swift
 PDF(source: source)
-    .pdf.overlay { page in
-        Text(page.label ?? "")
-            .font(.caption.monospaced())
-            .padding(8)
-            .background(.blue.opacity(0.75))
-            .foregroundStyle(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-    .pdf.overlayRelease { page in
-        // cleanup for this page
-    }
+  .pdf.overlay { page in
+    Text(page.label ?? "")
+      .font(.caption.monospaced())
+      .padding(8)
+      .background(.blue.opacity(0.75))
+      .foregroundStyle(.white)
+      .clipShape(RoundedRectangle(cornerRadius: 8))
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+  .pdf.overlayRelease { page in
+    // cleanup for this page
+  }
 ```
 
 Overlay behavior is explicit by platform:
