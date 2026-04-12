@@ -1368,7 +1368,8 @@ private func currentPageIndex(in pdfView: PDFView) -> Int {
 }
 
 private func fixturePDFURL() throws -> URL {
-  let fixtureURL = try sourceFileURL("Tests/PDFTests/Fixtures/drawingwithquartz2d.pdf")
+  let fixtureURL = try repositoryRootURL()
+    .appendingPathComponent("Tests/PDFTests/Fixtures/drawingwithquartz2d.pdf")
 
   guard FileManager.default.fileExists(atPath: fixtureURL.path) else {
     throw NSError(
@@ -1379,10 +1380,6 @@ private func fixturePDFURL() throws -> URL {
   }
 
   return fixtureURL
-}
-
-private func sourceFileURL(_ relativePath: String) throws -> URL {
-  try repositoryRootURL().appendingPathComponent(relativePath)
 }
 
 private func repositoryRootURL() throws -> URL {

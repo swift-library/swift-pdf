@@ -3,8 +3,8 @@ import SwiftUI
 
 @MainActor
 final class PDFPageOverlayViewLifecycle {
-  private var contentProvider: PDFPageOverlayViewContentProvider = { _ in nil }
-  private var release: PDFPageOverlayViewRelease = { _ in }
+  private(set) var contentProvider: PDFPageOverlayViewContentProvider = { _ in nil }
+  private(set) var release: PDFPageOverlayViewRelease = { _ in }
   var viewRegistry = PDFPageOverlayViewRegistry()
 
   func updateCallbacks(
@@ -17,28 +17,20 @@ final class PDFPageOverlayViewLifecycle {
 
   func refreshOverlayViewsIfNeeded() {
     viewRegistry.refresh(
-      contentProvider: overlayContent(for:),
-      release: releaseOverlay(for:)
+      contentProvider: contentProvider,
+      release: release
     )
   }
 
   func clearOverlayViews() {
-    viewRegistry.clear(release: releaseOverlay(for:))
+    viewRegistry.clear(release: release)
   }
 
   func willDisplayOverlayView(for page: PDFPage) {
-    viewRegistry.willDisplayOverlayView(for: page, contentProvider: overlayContent(for:))
+    viewRegistry.willDisplayOverlayView(for: page, contentProvider: contentProvider)
   }
 
   func didEndDisplayingOverlayView(for page: PDFPage) {
-    viewRegistry.didEndDisplayingOverlayView(for: page, release: releaseOverlay(for:))
-  }
-
-  func overlayContent(for page: PDFPage) -> AnyView? {
-    contentProvider(page)
-  }
-
-  private func releaseOverlay(for page: PDFPage) {
-    release(page)
+    viewRegistry.didEndDisplayingOverlayView(for: page, release: release)
   }
 }

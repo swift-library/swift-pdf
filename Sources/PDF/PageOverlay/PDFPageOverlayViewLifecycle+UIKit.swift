@@ -4,7 +4,7 @@
 
   extension PDFPageOverlayViewLifecycle {
     func overlayView(for page: PDFPage) -> UIView? {
-      viewRegistry.overlayView(for: page, contentProvider: overlayContent(for:))
+      viewRegistry.overlayView(for: page, contentProvider: contentProvider)
     }
   }
 #endif
