@@ -2,7 +2,6 @@ import PDFKit
 import SwiftUI
 
 private extension Int {
-  
   func clamped(to pageCount: Int) -> Int {
     guard pageCount > 0 else {
       return 0
