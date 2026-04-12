@@ -9,7 +9,6 @@ Phase-1 focuses on a thin, reusable viewing foundation with clean seams for futu
 
 - `PDFDocument.Representation`: document loading/input boundary (`PDFDocument`, `Data`, `URL`).
 - `PDFKit`: current fixed viewer backend (no alternate backend abstraction in this phase).
-- `PDFViewContainer`: SwiftUI host/container boundary (`PDFKit` bridge).
 - `PDFViewReader` + `PDFViewProxy`: command boundary for viewer/session-scoped imperative actions.
 - `.pdf.displayMode(_:)` / `.pdf.displayDirection(_:)` / `.pdf.autoScales(_:)` / `.pdf.isInMarkupMode(_:)`: viewer configuration boundary.
 - `.pdf.currentPage(_:)` + `.pdf.pageCount(_:)` + `.pdf.scaleFactor(_:)`: settled viewer state boundary. These bindings reflect `PDFView`'s actual settled state, not command echo.
@@ -104,6 +103,13 @@ State and command semantics are intentionally split:
 - `PDFViewProxy` sends imperative navigation commands.
 - `currentPage`, `pageCount`, and `scaleFactor` publish settled `PDFView` state.
 - Writing those bindings from the outside is not a navigation API.
+
+Command/state flow:
+
+```text
+PDFViewReader -> PDFViewProxy -> PDFView command dispatch
+PDFKit settled page/scale change -> published bindings
+```
 
 Additional currently exported proxy commands:
 
