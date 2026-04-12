@@ -11,27 +11,42 @@ private extension Int {
   }
 }
 
-extension PDFView {
-  func publish(_ pageBindings: PDFPageBindings) {
-    let pageCount = document?.pageCount ?? 0
-    if let countBinding = pageBindings.pageCount, countBinding.wrappedValue != pageCount {
-      countBinding.wrappedValue = pageCount
-    }
+private extension CGFloat {
+  func clamped(to range: ClosedRange<CGFloat>) -> CGFloat {
+    Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
+  }
+}
 
-    let currentIndex = pageIndex
-    if let indexBinding = pageBindings.pageIndex, indexBinding.wrappedValue != currentIndex {
-      indexBinding.wrappedValue = currentIndex
-    }
+extension PDFView {
+  func publishCurrentPage(_ pageBindings: PDFPageBindings) {
+    let currentPage = currentPageIndex
+    pageBindings.currentPage?.setIfChanged(currentPage)
   }
 
-  func go(to pageIndex: Int) {
+  func publishPageCount(_ pageBindings: PDFPageBindings) {
+    let currentPageCount = document?.pageCount ?? 0
+    pageBindings.pageCount?.setIfChanged(currentPageCount)
+  }
+
+  func publishScaleFactor(_ pageBindings: PDFPageBindings) {
+    let currentScaleFactor = scaleFactor
+    pageBindings.scaleFactor?.setIfChanged(currentScaleFactor)
+  }
+
+  func publishState(_ pageBindings: PDFPageBindings) {
+    publishPageCount(pageBindings)
+    publishCurrentPage(pageBindings)
+    publishScaleFactor(pageBindings)
+  }
+
+  func goToPage(at pageIndex: Int) {
     let pageCount = document?.pageCount ?? 0
     guard pageCount > 0 else {
       return
     }
 
     let destinationIndex = pageIndex.clamped(to: pageCount)
-    let currentPageIndex = self.pageIndex
+    let currentPageIndex = self.currentPageIndex
     guard destinationIndex != currentPageIndex else {
       return
     }
@@ -53,6 +68,26 @@ extension PDFView {
     go(to: destination)
   }
 
+  func goToSelection(_ selection: PDFSelection) {
+    setCurrentSelection(selection, animate: true)
+    go(to: selection)
+  }
+
+  func setScaleFactor(_ scaleFactor: CGFloat) {
+    let resolvedScaleFactor: CGFloat
+    if minScaleFactor > 0, maxScaleFactor >= minScaleFactor {
+      resolvedScaleFactor = scaleFactor.clamped(to: minScaleFactor...maxScaleFactor)
+    } else {
+      resolvedScaleFactor = scaleFactor
+    }
+
+    guard self.scaleFactor != resolvedScaleFactor else {
+      return
+    }
+
+    self.scaleFactor = resolvedScaleFactor
+  }
+
   func destination(at pageIndex: Int) -> PDFDestination? {
     let pageCount = document?.pageCount ?? 0
     guard pageCount > 0 else {
@@ -60,7 +95,7 @@ extension PDFView {
     }
 
     let destinationIndex = pageIndex.clamped(to: pageCount)
-    guard destinationIndex != self.pageIndex,
+    guard destinationIndex != currentPageIndex,
       let page = document?.page(at: destinationIndex)
     else {
       return nil
@@ -71,7 +106,7 @@ extension PDFView {
     return PDFDestination(page: page, at: topLeading)
   }
 
-  var pageIndex: Int {
+  var currentPageIndex: Int {
     guard let document = document,
       document.pageCount > 0,
       let currentPage = currentPage

@@ -20,7 +20,7 @@ extension PDFTests {
         coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
-        pageIndexBinding: nil,
+        currentPageBinding: nil,
         pageCountBinding: nil
       )
 
@@ -58,7 +58,7 @@ extension PDFTests {
         coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
-        pageIndexBinding: nil,
+        currentPageBinding: nil,
         pageCountBinding: nil
       )
 
@@ -85,7 +85,7 @@ extension PDFTests {
         coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
-        pageIndexBinding: nil,
+        currentPageBinding: nil,
         pageCountBinding: nil
       )
 

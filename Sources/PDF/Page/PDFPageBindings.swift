@@ -1,12 +1,19 @@
+import CoreGraphics
 import SwiftUI
 
 @MainActor
 struct PDFPageBindings {
-  var pageIndex: Binding<Int>?
+  var currentPage: Binding<Int>?
   var pageCount: Binding<Int>?
+  var scaleFactor: Binding<CGFloat>?
 
-  init(pageIndex: Binding<Int>? = nil, pageCount: Binding<Int>? = nil) {
-    self.pageIndex = pageIndex
+  init(
+    currentPage: Binding<Int>? = nil,
+    pageCount: Binding<Int>? = nil,
+    scaleFactor: Binding<CGFloat>? = nil
+  ) {
+    self.currentPage = currentPage
     self.pageCount = pageCount
+    self.scaleFactor = scaleFactor
   }
 }

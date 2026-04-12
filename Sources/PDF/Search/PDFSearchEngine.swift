@@ -1,139 +1,117 @@
-import PDFKit
 import Foundation
+import PDFKit
 
 @MainActor
 final class PDFSearchEngine {
   private let document: PDFDocument
-  private var state = State()
+  private(set) var state = State()
 
   init(document: PDFDocument) {
     self.document = document
   }
 
-  func decide(
-    query: String,
-    options: NSString.CompareOptions,
-    selectionIndex: Int?
-  ) -> Decision {
-    let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
-    if performFind(query: normalizedQuery, options: options) {
-      guard !state.results.isEmpty else {
-        return .clearSelection(publication)
-      }
-      guard let selection = state.focus(at: 0) else {
-        return .publish(publication)
-      }
-      return .focus(selection, publication)
-    }
-
-    guard !state.results.isEmpty else {
-      return .publish(publication)
-    }
-
-    let targetIndex: Int
-    if let selectionIndex {
-      targetIndex = min(max(selectionIndex, 0), state.selections.count - 1)
-      guard state.selectionIndex != targetIndex else {
-        return .publish(publication)
-      }
-    } else {
-      guard state.selectionIndex == nil else {
-        return .publish(publication)
-      }
-      targetIndex = 0
-    }
-
-    guard let selection = state.focus(at: targetIndex) else {
-      return .publish(publication)
-    }
-    return .focus(selection, publication)
-  }
-
-  private func performFind(
+  func performFind(
     query: String,
     options: NSString.CompareOptions
   ) -> Bool {
-    guard query != state.query || options != state.options else {
+    let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+    let pageCount = document.pageCount
+
+    guard normalizedQuery != state.query
+      || options != state.options
+      || pageCount != state.pageCount
+    else {
       return false
     }
 
-    state.query = query
+    state.query = normalizedQuery
     state.options = options
+    state.pageCount = pageCount
 
-    guard !query.isEmpty else {
+    guard !normalizedQuery.isEmpty, pageCount > 0 else {
       state.flush()
       return true
     }
 
-    guard document.pageCount > 0 else {
-      state.flush()
-      return true
-    }
+    state.selections = document.findString(normalizedQuery, withOptions: options)
+    state.results = state.selections.enumerated().map { element in
+      let index = element.offset
+      let selection = element.element
 
-    let selections = document.findString(query, withOptions: options)
-    guard !selections.isEmpty else {
-      state.flush()
-      return true
-    }
+      guard let page = selection.pages.first else {
+        return PDFSearchResult(
+          index: index,
+          pageIndex: 0,
+          bounds: .null,
+          text: selection.string ?? ""
+        )
+      }
 
-    state.selections = selections
-    state.results = selections.enumerated().map(PDFSearchResult.init)
-    state.selectionIndex = nil
+      let pageIndex = page.document.map { max(0, $0.index(for: page)) } ?? 0
+      return PDFSearchResult(
+        index: index,
+        pageIndex: pageIndex,
+        bounds: selection.bounds(for: page),
+        text: selection.string ?? ""
+      )
+    }
+    state.searchResultIndex = nil
     return true
   }
 
-  private var publication: Decision.Publication {
-    Decision.Publication(
-      selectionIndex: state.selectionIndex,
-      resultCount: state.results.count,
-      results: state.results
-    )
+  func goToSearchResult(at index: Int) -> PDFSelection? {
+    guard !state.selections.isEmpty else {
+      return nil
+    }
+
+    let targetIndex = Swift.min(Swift.max(index, 0), state.selections.count - 1)
+    state.searchResultIndex = targetIndex
+    return state.selections[targetIndex]
   }
 
+  func goToNextSearchResult() -> PDFSelection? {
+    guard !state.selections.isEmpty else {
+      return nil
+    }
+
+    let nextIndex = ((state.searchResultIndex ?? -1) + 1 + state.selections.count)
+      % state.selections.count
+    return goToSearchResult(at: nextIndex)
+  }
+
+  func goToPreviousSearchResult() -> PDFSelection? {
+    guard !state.selections.isEmpty else {
+      return nil
+    }
+
+    let previousIndex = ((state.searchResultIndex ?? 0) - 1 + state.selections.count)
+      % state.selections.count
+    return goToSearchResult(at: previousIndex)
+  }
+
+  func clearSelection() -> State {
+    state.searchResultIndex = nil
+    return state
+  }
 }
 
-private extension PDFSearchEngine {
+extension PDFSearchEngine {
   struct State {
     var query = ""
     var options: NSString.CompareOptions = []
+    var pageCount = 0
     var selections: [PDFSelection] = []
     var results: [PDFSearchResult] = []
-    var selectionIndex: Int?
+    var searchResultIndex: Int?
 
-    mutating func focus(at index: Int) -> PDFSelection? {
-      guard selections.indices.contains(index) else {
-        return nil
-      }
-
-      selectionIndex = index
-      return selections[index]
+    var searchResultCount: Int {
+      results.count
     }
 
     mutating func flush() {
       selections = []
       results = []
-      selectionIndex = nil
-    }
-  }
-}
-
-extension PDFSearchEngine {
-  enum Decision {
-    struct Publication {
-      let selectionIndex: Int?
-      let resultCount: Int
-      let results: [PDFSearchResult]
-    }
-
-    case publish(Publication)
-    case clearSelection(Publication)
-    case focus(PDFSelection, Publication)
-
-    var publication: Publication {
-      switch self {
-      case .publish(let publication), .clearSelection(let publication), .focus(_, let publication):
-        return publication
-      }
+      searchResultIndex = nil
     }
   }
 }

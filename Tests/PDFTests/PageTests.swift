@@ -8,172 +8,134 @@ extension PDFTests {
   @MainActor
   final class Page: PDFKitSuite {
     @Test
-    func pageBindingDrivesNavigationAndClampsOutOfRangeValues() throws {
+    func proxyPageCommandsDriveNavigationAndPublishSettledState() throws {
       let document = try #require(PDFDocument(url: fixturePDFURL()))
       #expect(document.pageCount > 0)
 
       let coordinator = PDFViewContainer.Coordinator()
       let pdfView = PDFView()
+      let proxy = makeProxy()
 
-      let pageIndexBox = IntBindingBox(0)
+      let currentPageBox = IntBindingBox(0)
       let pageCountBox = IntBindingBox(0)
 
       bindCoordinator(coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
-        pageIndexBinding: makeBinding(for: pageIndexBox),
-        pageCountBinding: makeBinding(for: pageCountBox)
+        currentPageBinding: makeBinding(for: currentPageBox),
+        pageCountBinding: makeBinding(for: pageCountBox),
+        proxy: proxy
       )
 
       #expect(pdfView.document === document)
       #expect(pageCountBox.value == document.pageCount)
-      #expect(pageIndexBox.value == 0)
+      #expect(currentPageBox.value == 0)
 
-      pageIndexBox.value = document.pageCount + 99
-      bindCoordinator(coordinator,
-        pdfView: pdfView,
-        initialSource: .document(document),
-        pageIndexBinding: makeBinding(for: pageIndexBox),
-        pageCountBinding: makeBinding(for: pageCountBox)
-      )
+      proxy.goToPage(at: document.pageCount + 99)
+      NotificationCenter.default.post(name: .PDFViewPageChanged, object: pdfView)
 
       let lastPageIndex = max(0, document.pageCount - 1)
-      #expect(pageIndexBox.value == lastPageIndex)
+      #expect(currentPageBox.value == lastPageIndex)
       #expect(currentPageIndex(in: pdfView) == lastPageIndex)
 
-      pageIndexBox.value = -123
-      bindCoordinator(coordinator,
-        pdfView: pdfView,
-        initialSource: .document(document),
-        pageIndexBinding: makeBinding(for: pageIndexBox),
-        pageCountBinding: makeBinding(for: pageCountBox)
-      )
+      proxy.goToPage(at: -123)
+      NotificationCenter.default.post(name: .PDFViewPageChanged, object: pdfView)
 
-      #expect(pageIndexBox.value == 0)
+      #expect(currentPageBox.value == 0)
       #expect(currentPageIndex(in: pdfView) == 0)
     }
 
     @Test
-    func internalPageChangesPublishBackIntoPageBinding() throws {
+    func internalPageChangesPublishBackIntoCurrentPageBinding() throws {
       let document = try #require(PDFDocument(url: fixturePDFURL()))
       #expect(document.pageCount > 1)
 
       let coordinator = PDFViewContainer.Coordinator()
       let pdfView = PDFView()
 
-      let pageIndexBox = IntBindingBox(0)
+      let currentPageBox = IntBindingBox(0)
       let pageCountBox = IntBindingBox(0)
 
       bindCoordinator(coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
-        pageIndexBinding: makeBinding(for: pageIndexBox),
+        currentPageBinding: makeBinding(for: currentPageBox),
         pageCountBinding: makeBinding(for: pageCountBox)
       )
 
-      #expect(pageIndexBox.value == 0)
+      #expect(currentPageBox.value == 0)
       #expect(pageCountBox.value == document.pageCount)
 
       pdfView.goToNextPage(nil)
-      bindCoordinator(coordinator,
-        pdfView: pdfView,
-        initialSource: .document(document),
-        pageIndexBinding: makeBinding(for: pageIndexBox),
-        pageCountBinding: makeBinding(for: pageCountBox)
-      )
+      NotificationCenter.default.post(name: .PDFViewPageChanged, object: pdfView)
 
-      #expect(pageIndexBox.value == 1)
+      #expect(currentPageBox.value == 1)
     }
 
     @Test
-    func adjacentPageBindingPrefersStepNavigationWithDestinationFallback() throws {
+    func adjacentPageCommandsPreferStepNavigationWithDestinationFallback() throws {
       let document = try #require(PDFDocument(url: fixturePDFURL()))
       #expect(document.pageCount > 2)
 
       let coordinator = PDFViewContainer.Coordinator()
       let pdfView = TrackingNavigationPDFView()
+      let proxy = makeProxy()
 
-      let pageIndexBox = IntBindingBox(0)
+      let currentPageBox = IntBindingBox(0)
       let pageCountBox = IntBindingBox(0)
 
       bindCoordinator(coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
-        pageIndexBinding: makeBinding(for: pageIndexBox),
-        pageCountBinding: makeBinding(for: pageCountBox)
+        currentPageBinding: makeBinding(for: currentPageBox),
+        pageCountBinding: makeBinding(for: pageCountBox),
+        proxy: proxy
       )
 
-      pageIndexBox.value = 1
-      bindCoordinator(coordinator,
-        pdfView: pdfView,
-        initialSource: .document(document),
-        pageIndexBinding: makeBinding(for: pageIndexBox),
-        pageCountBinding: makeBinding(for: pageCountBox)
-      )
+      proxy.goToPage(at: 1)
 
       #expect(pdfView.goToNextPageCallCount == 1)
       #expect(pdfView.goToPreviousPageCallCount == 0)
       #expect(pdfView.goToDestinationCallCount == 0)
 
-      pageIndexBox.value = 0
-      bindCoordinator(coordinator,
-        pdfView: pdfView,
-        initialSource: .document(document),
-        pageIndexBinding: makeBinding(for: pageIndexBox),
-        pageCountBinding: makeBinding(for: pageCountBox)
-      )
+      proxy.goToPage(at: 0)
 
       #expect(pdfView.goToPreviousPageCallCount == 1)
       #expect(pdfView.goToDestinationCallCount == 0)
 
-      pageIndexBox.value = 2
-      bindCoordinator(coordinator,
-        pdfView: pdfView,
-        initialSource: .document(document),
-        pageIndexBinding: makeBinding(for: pageIndexBox),
-        pageCountBinding: makeBinding(for: pageCountBox)
-      )
+      proxy.goToPage(at: 2)
 
       #expect(pdfView.goToDestinationCallCount == 1)
     }
 
     @Test
-    func pendingExternalPageNavigationIsNotOverwrittenByIntermediateRebind() throws {
+    func currentPageBindingWritesDoNotActAsCommands() throws {
       let document = try #require(PDFDocument(url: fixturePDFURL()))
       #expect(document.pageCount > 2)
 
       let coordinator = PDFViewContainer.Coordinator()
       let pdfView = NonAdvancingNavigationPDFView()
 
-      let pageIndexBox = IntBindingBox(0)
+      let currentPageBox = IntBindingBox(0)
       let pageCountBox = IntBindingBox(0)
 
       bindCoordinator(coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
-        pageIndexBinding: makeBinding(for: pageIndexBox),
+        currentPageBinding: makeBinding(for: currentPageBox),
         pageCountBinding: makeBinding(for: pageCountBox)
       )
 
-      pageIndexBox.value = 2
+      currentPageBox.value = 2
       bindCoordinator(coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
-        pageIndexBinding: makeBinding(for: pageIndexBox),
+        currentPageBinding: makeBinding(for: currentPageBox),
         pageCountBinding: makeBinding(for: pageCountBox)
       )
 
-      #expect(pageIndexBox.value == 2)
-      #expect(pdfView.goToDestinationCallCount == 1)
-
-      bindCoordinator(coordinator,
-        pdfView: pdfView,
-        initialSource: .document(document),
-        pageIndexBinding: makeBinding(for: pageIndexBox),
-        pageCountBinding: makeBinding(for: pageCountBox)
-      )
-
-      #expect(pageIndexBox.value == 2)
+      #expect(currentPageBox.value == 0)
+      #expect(pdfView.goToDestinationCallCount == 0)
     }
   }
 }

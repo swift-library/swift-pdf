@@ -17,32 +17,32 @@ extension PDFTests {
       let coordinator = PDFViewContainer.Coordinator()
       let pdfView = PDFView()
 
-      let pageIndexBox = TrackingIntBindingBox(0)
+      let currentPageBox = TrackingIntBindingBox(0)
       let pageCountBox = IntBindingBox(0)
 
       bindCoordinator(coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
-        pageIndexBinding: makeBinding(for: pageIndexBox),
+        currentPageBinding: makeBinding(for: currentPageBox),
         pageCountBinding: makeBinding(for: pageCountBox)
       )
 
       bindCoordinator(coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
-        pageIndexBinding: makeBinding(for: pageIndexBox),
+        currentPageBinding: makeBinding(for: currentPageBox),
         pageCountBinding: makeBinding(for: pageCountBox)
       )
 
-      let baselineSetCount = pageIndexBox.setCount
+      let baselineSetCount = currentPageBox.setCount
       pdfView.goToNextPage(nil)
       NotificationCenter.default.post(
         name: Notification.Name.PDFViewPageChanged,
         object: pdfView
       )
 
-      #expect(pageIndexBox.value == 1)
-      #expect(pageIndexBox.setCount == baselineSetCount + 1)
+      #expect(currentPageBox.value == 1)
+      #expect(currentPageBox.setCount == baselineSetCount + 1)
     }
 
     @Test
@@ -53,18 +53,24 @@ extension PDFTests {
       let coordinator = PDFViewContainer.Coordinator()
       let pdfView = PDFView()
 
-      let pageIndexBox = TrackingIntBindingBox(0)
+      let currentPageBox = TrackingIntBindingBox(0)
       let pageCountBox = IntBindingBox(0)
+      let scaleFactorBox = IntBindingBox(0)
 
       bindCoordinator(coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
-        pageIndexBinding: makeBinding(for: pageIndexBox),
-        pageCountBinding: makeBinding(for: pageCountBox)
+        currentPageBinding: makeBinding(for: currentPageBox),
+        pageCountBinding: makeBinding(for: pageCountBox),
+        scaleFactorBinding: Binding(
+          get: { CGFloat(scaleFactorBox.value) },
+          set: { scaleFactorBox.value = Int($0) }
+        )
       )
 
-      let pageIndexSnapshot = pageIndexBox.value
-      let pageSetCountSnapshot = pageIndexBox.setCount
+      let pageSnapshot = currentPageBox.value
+      let pageSetCountSnapshot = currentPageBox.setCount
+      let scaleSnapshot = scaleFactorBox.value
 
       coordinator.detach()
 
@@ -78,8 +84,9 @@ extension PDFTests {
         object: pdfView
       )
 
-      #expect(pageIndexBox.value == pageIndexSnapshot)
-      #expect(pageIndexBox.setCount == pageSetCountSnapshot)
+      #expect(currentPageBox.value == pageSnapshot)
+      #expect(currentPageBox.setCount == pageSetCountSnapshot)
+      #expect(scaleFactorBox.value == scaleSnapshot)
     }
 
     @Test
@@ -90,10 +97,10 @@ extension PDFTests {
       let coordinator = PDFViewContainer.Coordinator()
       let pdfView = NonDispatchingPDFView()
 
-      let pageIndexBox = IntBindingBox(0)
+      let currentPageBox = IntBindingBox(0)
       let pageCountBox = IntBindingBox(0)
       let queryBox = StringBindingBox("the")
-      let selectionBox = OptionalIntBindingBox(nil)
+      let searchResultIndexBox = OptionalIntBindingBox(nil)
       let resultCountBox = IntBindingBox(0)
       let optionsBox = SearchOptionsBindingBox([.caseInsensitive])
       let resultsBox = SearchResultsBindingBox([])
@@ -101,10 +108,10 @@ extension PDFTests {
       bindCoordinator(coordinator,
         pdfView: pdfView,
         initialSource: .document(populatedDocument),
-        pageIndexBinding: makeBinding(for: pageIndexBox),
+        currentPageBinding: makeBinding(for: currentPageBox),
         pageCountBinding: makeBinding(for: pageCountBox),
         searchQueryBinding: makeBinding(for: queryBox),
-        searchSelectionBinding: makeBinding(for: selectionBox),
+        searchResultIndexBinding: makeBinding(for: searchResultIndexBox),
         searchResultCountBinding: makeBinding(for: resultCountBox),
         searchOptionsBinding: makeBinding(for: optionsBox),
         searchResultsBinding: makeBinding(for: resultsBox)
@@ -113,15 +120,16 @@ extension PDFTests {
 
       #expect(resultCountBox.value > 0)
       #expect(pageCountBox.value == populatedDocument.pageCount)
+      #expect(searchResultIndexBox.value == nil)
 
       pdfView.document = emptyDocument
       bindCoordinator(coordinator,
         pdfView: pdfView,
         initialSource: .document(populatedDocument),
-        pageIndexBinding: makeBinding(for: pageIndexBox),
+        currentPageBinding: makeBinding(for: currentPageBox),
         pageCountBinding: makeBinding(for: pageCountBox),
         searchQueryBinding: makeBinding(for: queryBox),
-        searchSelectionBinding: makeBinding(for: selectionBox),
+        searchResultIndexBinding: makeBinding(for: searchResultIndexBox),
         searchResultCountBinding: makeBinding(for: resultCountBox),
         searchOptionsBinding: makeBinding(for: optionsBox),
         searchResultsBinding: makeBinding(for: resultsBox)
@@ -130,9 +138,9 @@ extension PDFTests {
 
       #expect(pdfView.document === emptyDocument)
       #expect(pageCountBox.value == 0)
-      #expect(pageIndexBox.value == 0)
+      #expect(currentPageBox.value == 0)
       #expect(resultCountBox.value == 0)
-      #expect(selectionBox.value == nil)
+      #expect(searchResultIndexBox.value == nil)
       #expect(resultsBox.value == [])
     }
 
@@ -144,20 +152,20 @@ extension PDFTests {
       let coordinator = PDFViewContainer.Coordinator()
       let pdfView = NonDispatchingPDFView()
 
-      var pageIndexValue = 0
+      var currentPageValue = 0
       var pageCountValue = 0
       var queryValue = "the"
-      var selectionValue: Int? = nil
+      var searchResultIndexValue: Int? = nil
       var resultCountValue = 0
       var optionsValue: NSString.CompareOptions = [.caseInsensitive]
       var resultsValue: [PDFSearchResult] = []
       var events: [String] = []
 
-      let pageIndexBinding = Binding(
-        get: { pageIndexValue },
+      let currentPageBinding = Binding(
+        get: { currentPageValue },
         set: {
-          pageIndexValue = $0
-          events.append("pageIndex")
+          currentPageValue = $0
+          events.append("currentPage")
         }
       )
       let pageCountBinding = Binding(
@@ -171,11 +179,11 @@ extension PDFTests {
         get: { queryValue },
         set: { queryValue = $0 }
       )
-      let selectionBinding = Binding(
-        get: { selectionValue },
+      let searchResultIndexBinding = Binding(
+        get: { searchResultIndexValue },
         set: {
-          selectionValue = $0
-          events.append("searchSelection")
+          searchResultIndexValue = $0
+          events.append("searchResultIndex")
         }
       )
       let resultCountBinding = Binding(
@@ -200,10 +208,10 @@ extension PDFTests {
       bindCoordinator(coordinator,
         pdfView: pdfView,
         initialSource: .document(emptyDocument),
-        pageIndexBinding: pageIndexBinding,
+        currentPageBinding: currentPageBinding,
         pageCountBinding: pageCountBinding,
         searchQueryBinding: queryBinding,
-        searchSelectionBinding: selectionBinding,
+        searchResultIndexBinding: searchResultIndexBinding,
         searchResultCountBinding: resultCountBinding,
         searchOptionsBinding: optionsBinding,
         searchResultsBinding: resultsBinding
@@ -213,10 +221,10 @@ extension PDFTests {
       bindCoordinator(coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
-        pageIndexBinding: pageIndexBinding,
+        currentPageBinding: currentPageBinding,
         pageCountBinding: pageCountBinding,
         searchQueryBinding: queryBinding,
-        searchSelectionBinding: selectionBinding,
+        searchResultIndexBinding: searchResultIndexBinding,
         searchResultCountBinding: resultCountBinding,
         searchOptionsBinding: optionsBinding,
         searchResultsBinding: resultsBinding
@@ -227,7 +235,7 @@ extension PDFTests {
       #expect(events.first == "pageCount")
       #expect(events[..<firstSearchEventIndex].contains("pageCount"))
       #expect(resultCountValue > 0)
-      #expect(selectionValue != nil)
+      #expect(searchResultIndexValue == nil)
     }
 
     @Test
@@ -238,22 +246,23 @@ extension PDFTests {
       let page = try #require(populatedDocument.page(at: 0))
 
       let coordinator = PDFViewContainer.Coordinator()
-      let pdfView = NonDispatchingPDFView()
+      let pdfView = PDFView()
+      let proxy = makeProxy()
 
-      var pageIndexValue = 0
+      var currentPageValue = 0
       var pageCountValue = 0
       var queryValue = "the"
-      var selectionValue: Int? = nil
+      var searchResultIndexValue: Int? = nil
       var resultCountValue = 0
       var optionsValue: NSString.CompareOptions = [.caseInsensitive]
       var resultsValue: [PDFSearchResult] = []
       var events: [String] = []
 
-      let pageIndexBinding = Binding(
-        get: { pageIndexValue },
+      let currentPageBinding = Binding(
+        get: { currentPageValue },
         set: {
-          pageIndexValue = $0
-          events.append("pageIndex")
+          currentPageValue = $0
+          events.append("currentPage")
         }
       )
       let pageCountBinding = Binding(
@@ -267,11 +276,11 @@ extension PDFTests {
         get: { queryValue },
         set: { queryValue = $0 }
       )
-      let selectionBinding = Binding(
-        get: { selectionValue },
+      let searchResultIndexBinding = Binding(
+        get: { searchResultIndexValue },
         set: {
-          selectionValue = $0
-          events.append("searchSelection")
+          searchResultIndexValue = $0
+          events.append("searchResultIndex")
         }
       )
       let resultCountBinding = Binding(
@@ -296,13 +305,14 @@ extension PDFTests {
       bindCoordinator(coordinator,
         pdfView: pdfView,
         initialSource: .document(populatedDocument),
-        pageIndexBinding: pageIndexBinding,
+        currentPageBinding: currentPageBinding,
         pageCountBinding: pageCountBinding,
         searchQueryBinding: queryBinding,
-        searchSelectionBinding: selectionBinding,
+        searchResultIndexBinding: searchResultIndexBinding,
         searchResultCountBinding: resultCountBinding,
         searchOptionsBinding: optionsBinding,
-        searchResultsBinding: resultsBinding
+        searchResultsBinding: resultsBinding,
+        proxy: proxy
       )
       await flushMainActorTasks()
 
@@ -318,46 +328,37 @@ extension PDFTests {
       )
       #expect(createOverlayView(using: coordinator, in: pdfView, for: page))
 
-      pageIndexValue = 1
-      bindCoordinator(coordinator,
-        pdfView: pdfView,
-        initialSource: .document(populatedDocument),
-        pageIndexBinding: pageIndexBinding,
-        pageCountBinding: pageCountBinding,
-        searchQueryBinding: queryBinding,
-        searchSelectionBinding: selectionBinding,
-        searchResultCountBinding: resultCountBinding,
-        searchOptionsBinding: optionsBinding,
-        searchResultsBinding: resultsBinding
-      )
-      #expect(pageIndexValue == 1)
+      proxy.goToNextPage()
+      NotificationCenter.default.post(name: .PDFViewPageChanged, object: pdfView)
+      #expect(currentPageValue == 1)
       drainRunLoop()
 
       events.removeAll()
       bindCoordinator(coordinator,
         pdfView: pdfView,
         initialSource: .document(emptyDocument),
-        pageIndexBinding: pageIndexBinding,
+        currentPageBinding: currentPageBinding,
         pageCountBinding: pageCountBinding,
         searchQueryBinding: queryBinding,
-        searchSelectionBinding: selectionBinding,
+        searchResultIndexBinding: searchResultIndexBinding,
         searchResultCountBinding: resultCountBinding,
         searchOptionsBinding: optionsBinding,
-        searchResultsBinding: resultsBinding
+        searchResultsBinding: resultsBinding,
+        proxy: proxy
       )
       await flushMainActorTasks()
 
       #expect(released == [ObjectIdentifier(page)])
       #expect(pageCountValue == 0)
-      #expect(pageIndexValue == 0)
+      #expect(currentPageValue == 0)
       #expect(resultCountValue == 0)
-      #expect(selectionValue == nil)
+      #expect(searchResultIndexValue == nil)
       #expect(resultsValue == [])
 
       let firstSearchEventIndex = try #require(events.firstIndex { $0.hasPrefix("search") })
       #expect(events.contains("overlayRelease"))
       #expect(events[..<firstSearchEventIndex].contains("pageCount"))
-      #expect(events[..<firstSearchEventIndex].contains("pageIndex"))
+      #expect(events[..<firstSearchEventIndex].contains("currentPage"))
     }
   }
 }

@@ -12,14 +12,25 @@ extension PDFViewContainer {
   @MainActor
   public final class Coordinator: NSObject {
     private weak var pdfView: PDFView?
+    private var proxy: PDFViewProxy? {
+      didSet {
+        oldValue?.relay = nil
+        proxy?.relay = relay
+      }
+    }
+    private var relay: PDFViewProxyRelay? {
+      didSet {
+        proxy?.relay = relay
+      }
+    }
 
     private var publishers = Set<AnyCancellable>()
 
     private let documentLoader = PDFDocument.CachedLoader()
-    private var searchEngine: PDFSearchEngine!
     private let searchBindingDriver = PDFSearchBindingDriver()
-    private let pageOverlayViewLifecycle = PDFPageOverlayViewLifecycle()
+    let pageOverlayViewLifecycle = PDFPageOverlayViewLifecycle()
 
+    private var searchEngine: PDFSearchEngine?
     private var pageBindings = PDFPageBindings()
     private var searchBindings = PDFSearchBindings()
 
@@ -27,16 +38,20 @@ extension PDFViewContainer {
       view pdfView: PDFView,
       from source: PDFDocument.Representation,
       pageBindings: PDFPageBindings,
-      searchBindings: PDFSearchBindings
+      searchBindings: PDFSearchBindings,
+      proxy: PDFViewProxy?
     ) {
       let viewChanged = self.pdfView !== pdfView
 
       if viewChanged {
         removePublishers()
+        relay = nil
         pageOverlayViewLifecycle.clearOverlayViews()
         self.pdfView = pdfView
-        installPublishers(for: pdfView)
+        self.proxy = nil
+        addPublishers(for: pdfView)
         documentLoader.flush()
+        searchBindingDriver.reset()
         searchEngine = nil
       }
 
@@ -49,20 +64,34 @@ extension PDFViewContainer {
       ) {
         pageOverlayViewLifecycle.clearOverlayViews()
         searchEngine = pdfView.document.map(PDFSearchEngine.init(document:))
+        configurePageOverlayViewProvider(in: pdfView)
+      } else if searchEngine == nil {
+        searchEngine = pdfView.document.map(PDFSearchEngine.init(document:))
       }
 
-      refreshPageBindings(in: pdfView)
-      refreshSearchBindings()
+      self.proxy = proxy
+      self.relay = PDFViewProxyRelay(
+        pdfView: pdfView,
+        pageBindings: pageBindings,
+        searchBindings: searchBindings,
+        searchBindingDriver: searchBindingDriver,
+        searchEngine: searchEngine
+      )
+      pdfView.publishState(pageBindings)
+      refreshSearchBindings(in: pdfView)
     }
 
     func detach() {
       removePublishers()
+      relay = nil
 
       pdfView = nil
+      proxy = nil
       pageBindings = PDFPageBindings()
       searchBindings = PDFSearchBindings()
       searchEngine = nil
       documentLoader.flush()
+      searchBindingDriver.reset()
       pageOverlayViewLifecycle.clearOverlayViews()
     }
 
@@ -92,7 +121,7 @@ extension PDFViewContainer {
       pageOverlayViewLifecycle.didEndDisplayingOverlayView(for: page)
     }
 
-    private func installPublishers(for pdfView: PDFView) {
+    private func addPublishers(for pdfView: PDFView) {
       removePublishers()
 
       NotificationCenter.default.publisher(
@@ -101,7 +130,7 @@ extension PDFViewContainer {
       )
       .sink { [weak self] _ in
         MainActor.assumeIsolated {
-          self.map { pdfView.publish($0.pageBindings) }
+          self.map { pdfView.publishState($0.pageBindings) }
         }
       }
       .store(in: &publishers)
@@ -112,7 +141,7 @@ extension PDFViewContainer {
       )
       .sink { [weak self] _ in
         MainActor.assumeIsolated {
-          self.map { pdfView.publish($0.pageBindings) }
+          self.map { pdfView.publishState($0.pageBindings) }
         }
       }
       .store(in: &publishers)
@@ -122,36 +151,20 @@ extension PDFViewContainer {
       publishers.removeAll()
     }
 
-    private func refreshPageBindings(in pdfView: PDFView) {
-      if let pageIndex = pageBindings.pageIndex?.wrappedValue {
-        pdfView.go(to: pageIndex)
-      }
-
-      pdfView.publish(pageBindings)
-    }
-
-    private func refreshSearchBindings() {
+    private func refreshSearchBindings(in pdfView: PDFView) {
       guard let searchEngine else {
         return
       }
 
-      let decision = searchBindingDriver.performFind(
-        engine: searchEngine,
-        searchBindings: searchBindings
-      )
-
-      switch decision {
-      case .publish:
-        break
-      case .clearSelection:
-        pdfView?.setCurrentSelection(nil, animate: false)
-      case .focus(let selection, _):
-        guard let pdfView else {
-          break
-        }
-        pdfView.setCurrentSelection(selection, animate: true)
-        pdfView.go(to: selection)
+      guard searchEngine.performFind(
+        query: searchBindings.query?.wrappedValue ?? "",
+        options: searchBindings.options?.wrappedValue ?? []
+      ) else {
+        return
       }
+
+      pdfView.setCurrentSelection(nil, animate: false)
+      searchBindingDriver.publish(searchEngine.state, searchBindings: searchBindings)
     }
   }
 }

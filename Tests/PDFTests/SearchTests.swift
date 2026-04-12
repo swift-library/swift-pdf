@@ -10,15 +10,17 @@ extension PDFTests {
   @MainActor
   final class Search: PDFKitSuite {
     @Test
-    func searchBindingsPublishMatchesAndSupportSelectionControl() async throws {
+    func searchBindingsPublishMatchesWithoutAutomaticNavigation() async throws {
       let document = try #require(PDFDocument(url: fixturePDFURL()))
       #expect(document.pageCount > 0)
 
       let coordinator = PDFViewContainer.Coordinator()
       let pdfView = PDFView()
 
+      let currentPageBox = IntBindingBox(0)
+      let pageCountBox = IntBindingBox(0)
       let queryBox = StringBindingBox("the")
-      let selectionBox = OptionalIntBindingBox(nil)
+      let searchResultIndexBox = OptionalIntBindingBox(nil)
       let resultCountBox = IntBindingBox(0)
       let optionsBox = SearchOptionsBindingBox([.caseInsensitive])
       let resultsBox = SearchResultsBindingBox([])
@@ -26,53 +28,40 @@ extension PDFTests {
       bindCoordinator(coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
-        pageIndexBinding: nil,
-        pageCountBinding: nil,
+        currentPageBinding: makeBinding(for: currentPageBox),
+        pageCountBinding: makeBinding(for: pageCountBox),
         searchQueryBinding: makeBinding(for: queryBox),
-        searchSelectionBinding: makeBinding(for: selectionBox),
+        searchResultIndexBinding: makeBinding(for: searchResultIndexBox),
         searchResultCountBinding: makeBinding(for: resultCountBox),
         searchOptionsBinding: makeBinding(for: optionsBox),
         searchResultsBinding: makeBinding(for: resultsBox)
       )
       await flushMainActorTasks()
+
       #expect(resultCountBox.value > 0)
-      #expect(selectionBox.value == 0)
+      #expect(searchResultIndexBox.value == nil)
       #expect(resultsBox.value.count == resultCountBox.value)
+      #expect(currentPageBox.value == 0)
+      #expect(currentPageIndex(in: pdfView) == 0)
+
       for (offset, hit) in resultsBox.value.enumerated() {
         #expect(hit.index == offset)
-      }
-
-      selectionBox.value = resultCountBox.value + 99
-      bindCoordinator(coordinator,
-        pdfView: pdfView,
-        initialSource: .document(document),
-        pageIndexBinding: nil,
-        pageCountBinding: nil,
-        searchQueryBinding: makeBinding(for: queryBox),
-        searchSelectionBinding: makeBinding(for: selectionBox),
-        searchResultCountBinding: makeBinding(for: resultCountBox),
-        searchOptionsBinding: makeBinding(for: optionsBox),
-        searchResultsBinding: makeBinding(for: resultsBox)
-      )
-      await flushMainActorTasks()
-      #expect(selectionBox.value == max(0, resultCountBox.value - 1))
-      if let selectedIndex = selectionBox.value, resultsBox.value.indices.contains(selectedIndex) {
-        #expect(currentPageIndex(in: pdfView) == resultsBox.value[selectedIndex].pageIndex)
       }
     }
 
     @Test
-    func searchQueryRefreshMovesPageBindingToFirstSearchMatch() async throws {
+    func proxySearchCommandsNavigateAndPublishSearchResultIndex() async throws {
       let document = try #require(PDFDocument(url: fixturePDFURL()))
       #expect(document.pageCount > 1)
 
       let coordinator = PDFViewContainer.Coordinator()
       let pdfView = PDFView()
+      let proxy = makeProxy()
 
-      let pageIndexBox = IntBindingBox(0)
+      let currentPageBox = IntBindingBox(0)
       let pageCountBox = IntBindingBox(0)
       let queryBox = StringBindingBox("apple")
-      let selectionBox = OptionalIntBindingBox(nil)
+      let searchResultIndexBox = OptionalIntBindingBox(nil)
       let resultCountBox = IntBindingBox(0)
       let optionsBox = SearchOptionsBindingBox([.caseInsensitive])
       let resultsBox = SearchResultsBindingBox([])
@@ -80,33 +69,34 @@ extension PDFTests {
       bindCoordinator(coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
-        pageIndexBinding: makeBinding(for: pageIndexBox),
+        currentPageBinding: makeBinding(for: currentPageBox),
         pageCountBinding: makeBinding(for: pageCountBox),
         searchQueryBinding: makeBinding(for: queryBox),
-        searchSelectionBinding: makeBinding(for: selectionBox),
+        searchResultIndexBinding: makeBinding(for: searchResultIndexBox),
         searchResultCountBinding: makeBinding(for: resultCountBox),
         searchOptionsBinding: makeBinding(for: optionsBox),
-        searchResultsBinding: makeBinding(for: resultsBox)
-      )
-      await flushMainActorTasks()
-      bindCoordinator(coordinator,
-        pdfView: pdfView,
-        initialSource: .document(document),
-        pageIndexBinding: makeBinding(for: pageIndexBox),
-        pageCountBinding: makeBinding(for: pageCountBox),
-        searchQueryBinding: makeBinding(for: queryBox),
-        searchSelectionBinding: makeBinding(for: selectionBox),
-        searchResultCountBinding: makeBinding(for: resultCountBox),
-        searchOptionsBinding: makeBinding(for: optionsBox),
-        searchResultsBinding: makeBinding(for: resultsBox)
+        searchResultsBinding: makeBinding(for: resultsBox),
+        proxy: proxy
       )
       await flushMainActorTasks()
 
-      let selectedIndex = try #require(selectionBox.value)
+      #expect(resultCountBox.value > 0)
+      #expect(searchResultIndexBox.value == nil)
+
+      proxy.goToSearchResult(at: resultCountBox.value + 99)
+      await flushMainActorTasks()
+
+      let selectedIndex = max(0, resultCountBox.value - 1)
+      #expect(searchResultIndexBox.value == selectedIndex)
       #expect(resultsBox.value.indices.contains(selectedIndex))
-      #expect(pageCountBox.value == document.pageCount)
-      #expect(pageIndexBox.value == resultsBox.value[selectedIndex].pageIndex)
-      #expect(pageIndexBox.value > 0)
+      #expect(currentPageBox.value == resultsBox.value[selectedIndex].pageIndex)
+
+      proxy.goToPreviousSearchResult()
+      await flushMainActorTasks()
+
+      let previousIndex = ((selectedIndex - 1) + resultCountBox.value) % resultCountBox.value
+      #expect(searchResultIndexBox.value == previousIndex)
+      #expect(currentPageBox.value == resultsBox.value[previousIndex].pageIndex)
     }
 
     @Test
@@ -117,7 +107,7 @@ extension PDFTests {
       let pdfView = PDFView()
 
       let queryBox = StringBindingBox("apple")
-      let selectionBox = OptionalIntBindingBox(nil)
+      let searchResultIndexBox = OptionalIntBindingBox(nil)
       let resultCountBox = IntBindingBox(0)
       let optionsBox = SearchOptionsBindingBox([.caseInsensitive])
       let resultsBox = SearchResultsBindingBox([])
@@ -125,10 +115,10 @@ extension PDFTests {
       bindCoordinator(coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
-        pageIndexBinding: nil,
+        currentPageBinding: nil,
         pageCountBinding: nil,
         searchQueryBinding: makeBinding(for: queryBox),
-        searchSelectionBinding: makeBinding(for: selectionBox),
+        searchResultIndexBinding: makeBinding(for: searchResultIndexBox),
         searchResultCountBinding: makeBinding(for: resultCountBox),
         searchOptionsBinding: makeBinding(for: optionsBox),
         searchResultsBinding: makeBinding(for: resultsBox)
@@ -142,10 +132,10 @@ extension PDFTests {
       bindCoordinator(coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
-        pageIndexBinding: nil,
+        currentPageBinding: nil,
         pageCountBinding: nil,
         searchQueryBinding: makeBinding(for: queryBox),
-        searchSelectionBinding: makeBinding(for: selectionBox),
+        searchResultIndexBinding: makeBinding(for: searchResultIndexBox),
         searchResultCountBinding: makeBinding(for: resultCountBox),
         searchOptionsBinding: makeBinding(for: optionsBox),
         searchResultsBinding: makeBinding(for: resultsBox)
@@ -153,7 +143,7 @@ extension PDFTests {
       await flushMainActorTasks()
 
       #expect(resultCountBox.value == 0)
-      #expect(selectionBox.value == nil)
+      #expect(searchResultIndexBox.value == nil)
       #expect(resultsBox.value == [])
     }
 
@@ -165,7 +155,7 @@ extension PDFTests {
       let pdfView = PDFView()
 
       let queryBox = StringBindingBox("Quartz")
-      let selectionBox = OptionalIntBindingBox(nil)
+      let searchResultIndexBox = OptionalIntBindingBox(nil)
       let resultCountBox = IntBindingBox(0)
       let optionsBox = SearchOptionsBindingBox([.caseInsensitive])
       let resultsBox = SearchResultsBindingBox([])
@@ -173,10 +163,10 @@ extension PDFTests {
       bindCoordinator(coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
-        pageIndexBinding: nil,
+        currentPageBinding: nil,
         pageCountBinding: nil,
         searchQueryBinding: makeBinding(for: queryBox),
-        searchSelectionBinding: makeBinding(for: selectionBox),
+        searchResultIndexBinding: makeBinding(for: searchResultIndexBox),
         searchResultCountBinding: makeBinding(for: resultCountBox),
         searchOptionsBinding: makeBinding(for: optionsBox),
         searchResultsBinding: makeBinding(for: resultsBox)
@@ -187,10 +177,10 @@ extension PDFTests {
       bindCoordinator(coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
-        pageIndexBinding: nil,
+        currentPageBinding: nil,
         pageCountBinding: nil,
         searchQueryBinding: makeBinding(for: queryBox),
-        searchSelectionBinding: makeBinding(for: selectionBox),
+        searchResultIndexBinding: makeBinding(for: searchResultIndexBox),
         searchResultCountBinding: makeBinding(for: resultCountBox),
         searchOptionsBinding: makeBinding(for: optionsBox),
         searchResultsBinding: makeBinding(for: resultsBox)
@@ -198,7 +188,7 @@ extension PDFTests {
       await flushMainActorTasks()
 
       #expect(resultCountBox.value == 0)
-      #expect(selectionBox.value == nil)
+      #expect(searchResultIndexBox.value == nil)
       #expect(resultsBox.value == [])
     }
 
@@ -210,12 +200,12 @@ extension PDFTests {
       let pdfView = PDFView()
 
       var queryValue = "the"
-      var selectionValue: Int? = nil
+      var searchResultIndexValue: Int? = nil
       var resultCountValue = 0
       var optionsValue: NSString.CompareOptions = [.caseInsensitive]
       var resultsValue: [PDFSearchResult] = []
 
-      var selectionSetCount = 0
+      var searchResultIndexSetCount = 0
       var resultCountSetCount = 0
       var resultsSetCount = 0
 
@@ -223,11 +213,11 @@ extension PDFTests {
         get: { queryValue },
         set: { queryValue = $0 }
       )
-      let selectionBinding = Binding(
-        get: { selectionValue },
+      let searchResultIndexBinding = Binding(
+        get: { searchResultIndexValue },
         set: {
-          selectionValue = $0
-          selectionSetCount += 1
+          searchResultIndexValue = $0
+          searchResultIndexSetCount += 1
         }
       )
       let resultCountBinding = Binding(
@@ -253,10 +243,10 @@ extension PDFTests {
         coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
-        pageIndexBinding: nil,
+        currentPageBinding: nil,
         pageCountBinding: nil,
         searchQueryBinding: queryBinding,
-        searchSelectionBinding: selectionBinding,
+        searchResultIndexBinding: searchResultIndexBinding,
         searchResultCountBinding: resultCountBinding,
         searchOptionsBinding: optionsBinding,
         searchResultsBinding: resultsBinding
@@ -264,7 +254,7 @@ extension PDFTests {
       await flushMainActorTasks()
 
       #expect(resultCountValue > 0)
-      let selectionSetCountAfterFirstBind = selectionSetCount
+      let searchResultIndexSetCountAfterFirstBind = searchResultIndexSetCount
       let resultCountSetCountAfterFirstBind = resultCountSetCount
       let resultsSetCountAfterFirstBind = resultsSetCount
 
@@ -272,17 +262,17 @@ extension PDFTests {
         coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
-        pageIndexBinding: nil,
+        currentPageBinding: nil,
         pageCountBinding: nil,
         searchQueryBinding: queryBinding,
-        searchSelectionBinding: selectionBinding,
+        searchResultIndexBinding: searchResultIndexBinding,
         searchResultCountBinding: resultCountBinding,
         searchOptionsBinding: optionsBinding,
         searchResultsBinding: resultsBinding
       )
       await flushMainActorTasks()
 
-      #expect(selectionSetCount == selectionSetCountAfterFirstBind)
+      #expect(searchResultIndexSetCount == searchResultIndexSetCountAfterFirstBind)
       #expect(resultCountSetCount == resultCountSetCountAfterFirstBind)
       #expect(resultsSetCount == resultsSetCountAfterFirstBind)
     }
@@ -295,42 +285,43 @@ extension PDFTests {
       let coordinator = PDFViewContainer.Coordinator()
       let pdfView = PDFView()
 
-      let pageIndexBox = IntBindingBox(0)
+      let currentPageBox = IntBindingBox(0)
       let pageCountBox = IntBindingBox(0)
       let queryBox = StringBindingBox("Quartz")
-      let selectionBox = OptionalIntBindingBox(nil)
+      let searchResultIndexBox = OptionalIntBindingBox(nil)
       let resultCountBox = IntBindingBox(0)
 
       bindCoordinator(coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
-        pageIndexBinding: makeBinding(for: pageIndexBox),
+        currentPageBinding: makeBinding(for: currentPageBox),
         pageCountBinding: makeBinding(for: pageCountBox),
         searchQueryBinding: makeBinding(for: queryBox),
-        searchSelectionBinding: makeBinding(for: selectionBox),
+        searchResultIndexBinding: makeBinding(for: searchResultIndexBox),
         searchResultCountBinding: makeBinding(for: resultCountBox)
       )
       await flushMainActorTasks()
 
       let initialResultCount = resultCountBox.value
-      let initialSelection = selectionBox.value
+      let initialSearchResultIndex = searchResultIndexBox.value
       #expect(initialResultCount > 0)
 
-      pageIndexBox.value = 1
+      pdfView.goToNextPage(nil)
+      NotificationCenter.default.post(name: .PDFViewPageChanged, object: pdfView)
       bindCoordinator(coordinator,
         pdfView: pdfView,
         initialSource: .document(document),
-        pageIndexBinding: makeBinding(for: pageIndexBox),
+        currentPageBinding: makeBinding(for: currentPageBox),
         pageCountBinding: makeBinding(for: pageCountBox),
         searchQueryBinding: makeBinding(for: queryBox),
-        searchSelectionBinding: makeBinding(for: selectionBox),
+        searchResultIndexBinding: makeBinding(for: searchResultIndexBox),
         searchResultCountBinding: makeBinding(for: resultCountBox)
       )
       await flushMainActorTasks()
 
       #expect(queryBox.value == "Quartz")
       #expect(resultCountBox.value == initialResultCount)
-      #expect(selectionBox.value == initialSelection)
+      #expect(searchResultIndexBox.value == initialSearchResultIndex)
     }
   }
 }

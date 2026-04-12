@@ -10,9 +10,10 @@ Phase-1 focuses on a thin, reusable viewing foundation with clean seams for futu
 - `PDFDocument.Representation`: document loading/input boundary (`PDFDocument`, `Data`, `URL`).
 - `PDFKit`: current fixed viewer backend (no alternate backend abstraction in this phase).
 - `PDFViewContainer`: SwiftUI host/container boundary (`PDFKit` bridge).
+- `PDFViewReader` + `PDFViewProxy`: command boundary for viewer/session-scoped imperative actions.
 - `.pdf.displayMode(_:)` / `.pdf.displayDirection(_:)` / `.pdf.autoScales(_:)` / `.pdf.isInMarkupMode(_:)`: viewer configuration boundary.
-- `.pdf.page(_:)` + `.pdf.pageCount(_:)`: declarative navigation boundary.
-- `.pdf.searchQuery(_:)` + `.pdf.searchSelection(_:)` + `.pdf.searchResultCount(_:)` + `.pdf.searchOptions(_:)` + `.pdf.searchResults(_:)`: declarative search boundary, with search options bound as official `NSString.CompareOptions`.
+- `.pdf.currentPage(_:)` + `.pdf.pageCount(_:)` + `.pdf.scaleFactor(_:)`: settled viewer state boundary.
+- `.pdf.searchQuery(_:)` + `.pdf.searchResultIndex(_:)` + `.pdf.searchResultCount(_:)` + `.pdf.searchOptions(_:)` + `.pdf.searchResults(_:)`: search input/state boundary, with search options bound as official `NSString.CompareOptions`.
 - `.pdf.overlay(_:)`: per-page SwiftUI overlay hook boundary.
 
 ## Installation
@@ -31,10 +32,11 @@ import SwiftUI
 import PDF
 
 struct ReaderView: View {
-    @State private var pageIndex = 0
+    @State private var currentPage = 0
     @State private var pageCount = 0
+    @State private var scaleFactor: CGFloat = 1
     @State private var searchQuery = ""
-    @State private var searchSelection: Int? = nil
+    @State private var searchResultIndex: Int? = nil
     @State private var searchResultCount = 0
     @State private var searchOptions: NSString.CompareOptions = [.caseInsensitive]
     @State private var searchResults: [PDFSearchResult] = []
@@ -42,17 +44,26 @@ struct ReaderView: View {
     let source: PDFDocument.Representation
 
     var body: some View {
-        PDF(source: source)
-            .pdf.displayMode(.singlePageContinuous)
-            .pdf.displayDirection(.vertical)
-            .pdf.autoScales(true)
-            .pdf.page($pageIndex)
-            .pdf.pageCount($pageCount)
-            .pdf.searchQuery($searchQuery)
-            .pdf.searchSelection($searchSelection)
-            .pdf.searchResultCount($searchResultCount)
-            .pdf.searchOptions($searchOptions)
-            .pdf.searchResults($searchResults)
+        PDFViewReader { proxy in
+            VStack {
+                PDF(source: source)
+                    .pdf.displayMode(.singlePageContinuous)
+                    .pdf.displayDirection(.vertical)
+                    .pdf.autoScales(true)
+                    .pdf.currentPage($currentPage)
+                    .pdf.pageCount($pageCount)
+                    .pdf.scaleFactor($scaleFactor)
+                    .pdf.searchQuery($searchQuery)
+                    .pdf.searchResultIndex($searchResultIndex)
+                    .pdf.searchResultCount($searchResultCount)
+                    .pdf.searchOptions($searchOptions)
+                    .pdf.searchResults($searchResults)
+
+                Button("Next") {
+                    proxy.goToNextPage()
+                }
+            }
+        }
     }
 }
 ```
@@ -69,38 +80,41 @@ VStack {
 .pdf.autoScales(true)
 ```
 
-## Declarative navigation
+## Navigation with `PDFViewProxy`
 
-External controls update `page` directly. `PDF` will clamp invalid indices and publish the current page back through the same binding:
+External controls send commands through `PDFViewProxy`. `PDF` publishes settled state back through `currentPage`, `pageCount`, and `scaleFactor` bindings:
 
 ```swift
-Button("First") { pageIndex = 0 }
-Button("Prev") { pageIndex = max(0, pageIndex - 1) }
-Button("Next") { pageIndex = min(max(pageCount - 1, 0), pageIndex + 1) }
-Button("Last") {
-    if pageCount > 0 {
-        pageIndex = pageCount - 1
-    }
+PDFViewReader { proxy in
+    PDF(source: source)
+        .pdf.currentPage($currentPage)
+        .pdf.pageCount($pageCount)
+
+    Button("First") { proxy.goToFirstPage() }
+    Button("Prev") { proxy.goToPreviousPage() }
+    Button("Next") { proxy.goToNextPage() }
+    Button("Last") { proxy.goToLastPage() }
 }
 ```
 
-## Declarative search
+`PDFViewReader` currently supports one descendant `PDF` viewer per reader scope.
 
-Bind search text and selection index directly:
+## Search state and commands
+
+Bind query and settled search state directly. Query changes refresh search results, but they do not navigate automatically:
 
 ```swift
 TextField("Search", text: $searchQuery)
 
-Button("Prev") {
-    guard searchResultCount > 0 else { return }
-    let current = searchSelection ?? 0
-    searchSelection = (current - 1 + searchResultCount) % searchResultCount
-}
+PDFViewReader { proxy in
+    PDF(source: source)
+        .pdf.searchQuery($searchQuery)
+        .pdf.searchResultIndex($searchResultIndex)
+        .pdf.searchResultCount($searchResultCount)
+        .pdf.searchResults($searchResults)
 
-Button("Next") {
-    guard searchResultCount > 0 else { return }
-    let current = searchSelection ?? -1
-    searchSelection = (current + 1) % searchResultCount
+    Button("Prev") { proxy.goToPreviousSearchResult() }
+    Button("Next") { proxy.goToNextSearchResult() }
 }
 ```
 

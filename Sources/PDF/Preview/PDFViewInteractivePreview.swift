@@ -6,11 +6,12 @@
   struct PDFViewInteractivePreview: View {
     @State private var overlayTelemetry = PreviewOverlayTelemetry()
 
-    @State private var pageIndex: Int = 0
+    @State private var currentPage: Int = 0
     @State private var pageCount: Int = 0
+    @State private var scaleFactor: CGFloat = 1
     @State private var pageInput: String = "1"
     @State private var searchQuery: String = ""
-    @State private var searchSelection: Int? = nil
+    @State private var searchResultIndex: Int? = nil
     @State private var searchResultCount: Int = 0
     @State private var isInMarkupMode: Bool = true
     @State private var overlayMode: PreviewOverlayMode = .off
@@ -18,7 +19,7 @@
     let source: PDFDocument.Representation
 
     private var currentPageNumber: Int {
-      pageCount > 0 ? pageIndex + 1 : 0
+      pageCount > 0 ? currentPage + 1 : 0
     }
 
     private var pageSummary: String {
@@ -29,11 +30,11 @@
     }
 
     private var canGoToPreviousPage: Bool {
-      pageCount > 0 && pageIndex > 0
+      pageCount > 0 && currentPage > 0
     }
 
     private var canGoToNextPage: Bool {
-      pageCount > 0 && pageIndex < pageCount - 1
+      pageCount > 0 && currentPage < pageCount - 1
     }
 
     private var overlaySummary: String {
@@ -48,11 +49,15 @@
     }
 
     private var searchSummary: String {
-      guard searchResultCount > 0, let searchSelection else {
+      guard searchResultCount > 0 else {
         return "Matches: 0"
       }
 
-      return "Matches: \(searchSelection + 1)/\(searchResultCount)"
+      guard let searchResultIndex else {
+        return "Matches: \(searchResultCount)"
+      }
+
+      return "Matches: \(searchResultIndex + 1)/\(searchResultCount)"
     }
 
     private var canClearSearch: Bool {
@@ -60,16 +65,17 @@
     }
 
     @ViewBuilder
-    private var documentBody: some View {
+    private func documentBody(proxy: PDFViewProxy) -> some View {
       let base = PDF(source: source)
         .pdf.displayMode(.singlePageContinuous)
         .pdf.displayDirection(.vertical)
         .pdf.isInMarkupMode(isInMarkupMode)
         .pdf.autoScales(true)
-        .pdf.page($pageIndex)
+        .pdf.currentPage($currentPage)
         .pdf.pageCount($pageCount)
+        .pdf.scaleFactor($scaleFactor)
         .pdf.searchQuery($searchQuery)
-        .pdf.searchSelection($searchSelection)
+        .pdf.searchResultIndex($searchResultIndex)
         .pdf.searchResultCount($searchResultCount)
 
       if overlayMode == .off {
@@ -78,7 +84,6 @@
         base
           .pdf.overlay { page in
             let pageKey = overlayKey(for: page)
-            overlayTelemetry.noteProvided(pageKey)
             return makeOverlayContent(for: pageKey, mode: overlayMode)
           }
           .pdf.overlayRelease { page in
@@ -88,71 +93,57 @@
     }
 
     var body: some View {
-      documentBody
-        .safeAreaInset(edge: .top) {
-          PDFInteractivePreviewTopToolbar(
-            pageSummary: pageSummary,
-            overlaySummary: overlaySummary,
-            pageInput: $pageInput,
-            canGoToPreviousPage: canGoToPreviousPage,
-            canGoToNextPage: canGoToNextPage,
-            canJumpToPage: pageCount > 0,
-            isInMarkupMode: $isInMarkupMode,
-            overlayMode: $overlayMode,
-            showMarkupWarning: overlayMode != .off && !isInMarkupMode,
-            onFirst: goToFirstPage,
-            onPrevious: goToPreviousPage,
-            onNext: goToNextPage,
-            onLast: goToLastPage,
-            onJumpToPage: jumpToPageFromInput,
-            onResetOverlayTelemetry: overlayTelemetry.reset
-          )
-        }
-        .safeAreaInset(edge: .bottom) {
-          PDFInteractivePreviewBottomToolbar(
-            searchQuery: $searchQuery,
-            searchResultCount: searchResultCount,
-            searchSummary: searchSummary,
-            canClearSearch: canClearSearch,
-            onPreviousSearch: goToPreviousSearchResult,
-            onNextSearch: goToNextSearchResult,
-            onClearSearch: clearSearch
-          )
-        }
-        .onChange(of: pageIndex) { _, _ in
-          syncPageInput()
-        }
-        .onChange(of: pageCount) { _, _ in
-          syncPageInput()
-        }
-        .onChange(of: overlayMode) { _, _ in
-          overlayTelemetry.reset()
-        }
-        .onChange(of: isInMarkupMode) { _, _ in
-          overlayTelemetry.reset()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private func goToFirstPage() {
-      pageIndex = 0
-    }
-
-    private func goToPreviousPage() {
-      pageIndex = max(0, pageIndex - 1)
-    }
-
-    private func goToNextPage() {
-      pageIndex = min(max(pageCount - 1, 0), pageIndex + 1)
-    }
-
-    private func goToLastPage() {
-      if pageCount > 0 {
-        pageIndex = pageCount - 1
+      PDFViewReader { proxy in
+        documentBody(proxy: proxy)
+          .safeAreaInset(edge: .top) {
+            PDFInteractivePreviewTopToolbar(
+              pageSummary: pageSummary,
+              overlaySummary: overlaySummary,
+              pageInput: $pageInput,
+              canGoToPreviousPage: canGoToPreviousPage,
+              canGoToNextPage: canGoToNextPage,
+              canJumpToPage: pageCount > 0,
+              isInMarkupMode: $isInMarkupMode,
+              overlayMode: $overlayMode,
+              showMarkupWarning: overlayMode != .off && !isInMarkupMode,
+              onFirst: proxy.goToFirstPage,
+              onPrevious: proxy.goToPreviousPage,
+              onNext: proxy.goToNextPage,
+              onLast: proxy.goToLastPage,
+              onJumpToPage: { jumpToPageFromInput(proxy: proxy) },
+              onResetOverlayTelemetry: overlayTelemetry.reset
+            )
+          }
+          .safeAreaInset(edge: .bottom) {
+            PDFInteractivePreviewBottomToolbar(
+              searchQuery: $searchQuery,
+              searchResultCount: searchResultCount,
+              searchSummary: searchSummary,
+              canClearSearch: canClearSearch,
+              onPreviousSearch: proxy.goToPreviousSearchResult,
+              onNextSearch: proxy.goToNextSearchResult,
+              onClearSearch: {
+                clearSearch(proxy: proxy)
+              }
+            )
+          }
+          .onChange(of: currentPage) { _, _ in
+            syncPageInput()
+          }
+          .onChange(of: pageCount) { _, _ in
+            syncPageInput()
+          }
+          .onChange(of: overlayMode) { _, _ in
+            overlayTelemetry.reset()
+          }
+          .onChange(of: isInMarkupMode) { _, _ in
+            overlayTelemetry.reset()
+          }
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
     }
 
-    private func jumpToPageFromInput() {
+    private func jumpToPageFromInput(proxy: PDFViewProxy) {
       guard pageCount > 0,
         let pageNumber = Int(pageInput),
         (1...pageCount).contains(pageNumber)
@@ -160,30 +151,12 @@
         return
       }
 
-      pageIndex = pageNumber - 1
+      proxy.goToPage(at: pageNumber - 1)
     }
 
-    private func goToPreviousSearchResult() {
-      guard searchResultCount > 0 else {
-        return
-      }
-
-      let currentIndex = searchSelection ?? 0
-      searchSelection = (currentIndex - 1 + searchResultCount) % searchResultCount
-    }
-
-    private func goToNextSearchResult() {
-      guard searchResultCount > 0 else {
-        return
-      }
-
-      let currentIndex = searchSelection ?? -1
-      searchSelection = (currentIndex + 1) % searchResultCount
-    }
-
-    private func clearSearch() {
+    private func clearSearch(proxy: PDFViewProxy) {
       searchQuery = ""
-      searchSelection = nil
+      proxy.clearSelection()
     }
 
     private func syncPageInput() {
@@ -209,9 +182,15 @@
         EmptyView()
       case .badge:
         overlayBadge("Page \(pageKey)", verticalPadding: 6)
+          .onAppear {
+            overlayTelemetry.noteProvided(pageKey)
+          }
       case .interactive:
         overlayBadge("Tap \(pageKey)", verticalPadding: 7)
           .contentShape(RoundedRectangle(cornerRadius: 8))
+          .onAppear {
+            overlayTelemetry.noteProvided(pageKey)
+          }
           .onTapGesture {
             overlayTelemetry.noteTapped(pageKey)
           }

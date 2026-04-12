@@ -6,7 +6,7 @@ extension EnvironmentValues {
   var searchQueryBinding: Binding<String>? = nil
 
   @Entry
-  var searchSelectionBinding: Binding<Int?>? = nil
+  var searchResultIndexBinding: Binding<Int?>? = nil
 
   @Entry
   var searchResultCountBinding: Binding<Int>? = nil

@@ -13,29 +13,38 @@ func bindCoordinator(
   _ coordinator: PDFViewContainer.Coordinator,
   pdfView: PDFView,
   initialSource: PDFDocument.Representation,
-  pageIndexBinding: Binding<Int>?,
+  currentPageBinding: Binding<Int>?,
   pageCountBinding: Binding<Int>?,
+  scaleFactorBinding: Binding<CGFloat>? = nil,
   searchQueryBinding: Binding<String>? = nil,
-  searchSelectionBinding: Binding<Int?>? = nil,
+  searchResultIndexBinding: Binding<Int?>? = nil,
   searchResultCountBinding: Binding<Int>? = nil,
   searchOptionsBinding: Binding<NSString.CompareOptions>? = nil,
-  searchResultsBinding: Binding<[PDFSearchResult]>? = nil
+  searchResultsBinding: Binding<[PDFSearchResult]>? = nil,
+  proxy: PDFViewProxy? = nil
 ) {
   coordinator.bind(
     view: pdfView,
     from: initialSource,
     pageBindings: PDFPageBindings(
-      pageIndex: pageIndexBinding,
-      pageCount: pageCountBinding
+      currentPage: currentPageBinding,
+      pageCount: pageCountBinding,
+      scaleFactor: scaleFactorBinding
     ),
     searchBindings: PDFSearchBindings(
       query: searchQueryBinding,
-      selection: searchSelectionBinding,
-      resultCount: searchResultCountBinding,
+      searchResultIndex: searchResultIndexBinding,
+      searchResultCount: searchResultCountBinding,
       options: searchOptionsBinding,
       results: searchResultsBinding
-    )
+    ),
+    proxy: proxy
   )
+}
+
+@MainActor
+func makeProxy() -> PDFViewProxy {
+  PDFViewProxy()
 }
 
 @MainActor

@@ -4,7 +4,7 @@
 
   extension PDFPageOverlayViewLifecycle {
     func overlayView(for page: PDFPage) -> NSView? {
-      viewRegistry.overlayView(for: page, contentProvider: contentProvider)
+      return viewRegistry.overlayView(for: page, contentProvider: contentProvider)
     }
   }
 #endif

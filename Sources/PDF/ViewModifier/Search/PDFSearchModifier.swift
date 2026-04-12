@@ -7,8 +7,8 @@ extension PDFViewBase where Base: View {
     base.environment(\.searchQueryBinding, query)
   }
 
-  public func searchSelection(_ selection: Binding<Int?>) -> some View {
-    base.environment(\.searchSelectionBinding, selection)
+  public func searchResultIndex(_ index: Binding<Int?>) -> some View {
+    base.environment(\.searchResultIndexBinding, index)
   }
 
   public func searchResultCount(_ count: Binding<Int>) -> some View {

@@ -9,10 +9,12 @@ public struct PDFViewContainer {
   @Environment(\.displayDirection) private var displayDirection
   @Environment(\.autoScales) private var autoScales
   @Environment(\.isInMarkupMode) private var isInMarkupMode
-  @Environment(\.pageIndexBinding) private var pageIndexBinding
+  @Environment(\.pdfViewProxy) private var proxy
+  @Environment(\.currentPageBinding) private var currentPageBinding
   @Environment(\.pageCountBinding) private var pageCountBinding
+  @Environment(\.scaleFactorBinding) private var scaleFactorBinding
   @Environment(\.searchQueryBinding) private var searchQueryBinding
-  @Environment(\.searchSelectionBinding) private var searchSelectionBinding
+  @Environment(\.searchResultIndexBinding) private var searchResultIndexBinding
   @Environment(\.searchResultCountBinding) private var searchResultCountBinding
   @Environment(\.searchOptionsBinding) private var searchOptionsBinding
   @Environment(\.searchResultsBinding) private var searchResultsBinding
@@ -29,26 +31,27 @@ public struct PDFViewContainer {
   ) {
     pdfView.configure(using: resolvedConfiguration)
     coordinator.updatePageOverlayViewCallbacks(pageOverlayViewCallbacks)
-    configurePageOverlayViewProvider(pdfView, coordinator: coordinator)
+    coordinator.configurePageOverlayViewProvider(in: pdfView)
     coordinator.bind(
       view: pdfView,
       from: source,
       pageBindings: pageBindings,
-      searchBindings: searchBindings
+      searchBindings: searchBindings,
+      proxy: proxy
     )
   }
 
-  func makeConfiguredPDFView(
-    coordinator: Coordinator
+  func makePDFView(
+    bindingWith coordinator: Coordinator
   ) -> PDFView {
     let pdfView = PDFView()
     configure(pdfView, bindingWith: coordinator)
     return pdfView
   }
 
-  func updateConfiguredPDFView(
+  func updatePDFView(
     _ pdfView: PDFView,
-    coordinator: Coordinator
+    bindingWith coordinator: Coordinator
   ) {
     configure(pdfView, bindingWith: coordinator)
   }
@@ -64,16 +67,17 @@ public struct PDFViewContainer {
 
   private var pageBindings: PDFPageBindings {
     PDFPageBindings(
-      pageIndex: pageIndexBinding,
-      pageCount: pageCountBinding
+      currentPage: currentPageBinding,
+      pageCount: pageCountBinding,
+      scaleFactor: scaleFactorBinding
     )
   }
 
   private var searchBindings: PDFSearchBindings {
     PDFSearchBindings(
       query: searchQueryBinding,
-      selection: searchSelectionBinding,
-      resultCount: searchResultCountBinding,
+      searchResultIndex: searchResultIndexBinding,
+      searchResultCount: searchResultCountBinding,
       options: searchOptionsBinding,
       results: searchResultsBinding
     )
