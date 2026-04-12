@@ -4,7 +4,7 @@
 import PackageDescription
 
 let package = Package(
-  name: "PDF",
+  name: "swift-pdf",
   platforms: [
     .iOS("17.0"),
     .macOS("14.0"),
