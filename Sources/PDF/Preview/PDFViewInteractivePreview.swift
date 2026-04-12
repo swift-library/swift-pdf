@@ -65,7 +65,7 @@
     }
 
     @ViewBuilder
-    private func documentBody(proxy: PDFViewProxy) -> some View {
+    private func documentBody() -> some View {
       let base = PDF(source: source)
         .pdf.displayMode(.singlePageContinuous)
         .pdf.displayDirection(.vertical)
@@ -94,7 +94,7 @@
 
     var body: some View {
       PDFViewReader { proxy in
-        documentBody(proxy: proxy)
+        documentBody()
           .safeAreaInset(edge: .top) {
             PDFInteractivePreviewTopToolbar(
               pageSummary: pageSummary,

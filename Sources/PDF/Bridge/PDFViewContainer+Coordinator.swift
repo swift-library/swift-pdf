@@ -145,6 +145,23 @@ extension PDFViewContainer {
         }
       }
       .store(in: &publishers)
+
+      #if canImport(UIKit)
+        NotificationCenter.default.publisher(
+          for: Notification.Name.PDFViewVisiblePagesChanged,
+          object: pdfView
+        )
+        .sink { [weak self] _ in
+          MainActor.assumeIsolated {
+            // UIKit continuous-mode navigation can settle visible pages later than the
+            // initial command dispatch. Listen to visible-page changes so SwiftUI page
+            // bindings stay attached to PDFView's actual settled page; otherwise the
+            // preview toolbar can remain disabled or show a stale page number.
+            self.map { pdfView.publishState($0.pageBindings) }
+          }
+        }
+        .store(in: &publishers)
+      #endif
     }
 
     private func removePublishers() {

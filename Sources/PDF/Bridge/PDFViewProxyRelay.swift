@@ -27,7 +27,7 @@ final class PDFViewProxyRelay {
 
   func goToPage(at pageIndex: Int) {
     pdfView.goToPage(at: pageIndex)
-    schedulePageStatePublish()
+    publishPageState()
   }
 
   func goToNextPage() {
@@ -36,7 +36,7 @@ final class PDFViewProxyRelay {
     }
 
     pdfView.goToNextPage(nil)
-    schedulePageStatePublish()
+    publishPageState()
   }
 
   func goToPreviousPage() {
@@ -45,29 +45,17 @@ final class PDFViewProxyRelay {
     }
 
     pdfView.goToPreviousPage(nil)
-    schedulePageStatePublish()
+    publishPageState()
   }
 
   func goToFirstPage() {
-    guard let destination = pdfView.destination(at: 0)
-    else {
-      return
-    }
-
-    pdfView.go(to: destination)
-    schedulePageStatePublish()
+    pdfView.goToFirstPage()
+    publishPageState()
   }
 
   func goToLastPage() {
-    let pageCount = pdfView.document?.pageCount ?? 0
-    guard pageCount > 0,
-      let destination = pdfView.destination(at: pageCount - 1)
-    else {
-      return
-    }
-
-    pdfView.go(to: destination)
-    schedulePageStatePublish()
+    pdfView.goToLastPage()
+    publishPageState()
   }
 
   func goToSearchResult(at index: Int) {
@@ -79,7 +67,7 @@ final class PDFViewProxyRelay {
 
     pdfView.goToSelection(selection)
     searchBindingDriver.publish(searchEngine.state, searchBindings: searchBindings)
-    schedulePageStatePublish()
+    publishPageState()
   }
 
   func goToNextSearchResult() {
@@ -91,7 +79,7 @@ final class PDFViewProxyRelay {
 
     pdfView.goToSelection(selection)
     searchBindingDriver.publish(searchEngine.state, searchBindings: searchBindings)
-    schedulePageStatePublish()
+    publishPageState()
   }
 
   func goToPreviousSearchResult() {
@@ -103,27 +91,27 @@ final class PDFViewProxyRelay {
 
     pdfView.goToSelection(selection)
     searchBindingDriver.publish(searchEngine.state, searchBindings: searchBindings)
-    schedulePageStatePublish()
+    publishPageState()
   }
 
   func goToSelection(_ selection: PDFSelection) {
     pdfView.goToSelection(selection)
-    schedulePageStatePublish()
+    publishPageState()
   }
 
   func setScaleFactor(_ scaleFactor: CGFloat) {
     pdfView.setScaleFactor(scaleFactor)
-    schedulePageStatePublish()
+    publishPageState()
   }
 
   func zoomIn() {
     pdfView.zoomIn(nil)
-    schedulePageStatePublish()
+    publishPageState()
   }
 
   func zoomOut() {
     pdfView.zoomOut(nil)
-    schedulePageStatePublish()
+    publishPageState()
   }
 
   func clearSelection() {
@@ -133,7 +121,7 @@ final class PDFViewProxyRelay {
     searchBindingDriver.publish(state, searchBindings: searchBindings)
   }
 
-  private func schedulePageStatePublish() {
+  private func publishPageState() {
     pagePublishWorkItem?.cancel()
 
     let pagePublishWorkItem = DispatchWorkItem { [weak self] in
@@ -141,6 +129,11 @@ final class PDFViewProxyRelay {
     }
 
     self.pagePublishWorkItem = pagePublishWorkItem
-    DispatchQueue.main.async(execute: pagePublishWorkItem)
+    // UIKit can lag one or more main-queue turns before currentPage/visible pages settle
+    // after a navigation command. Defer the fallback state publish so SwiftUI bindings
+    // resynchronize with PDFView instead of briefly reading the pre-navigation page.
+    DispatchQueue.main.async {
+      DispatchQueue.main.async(execute: pagePublishWorkItem)
+    }
   }
 }
