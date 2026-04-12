@@ -28,7 +28,7 @@ public struct PDFViewContainer {
     bindingWith coordinator: Coordinator
   ) {
     pdfView.configure(using: resolvedConfiguration)
-    coordinator.updatePageOverlayViewCallbacks(pageOverlayCallbacks)
+    coordinator.updatePageOverlayViewCallbacks(pageOverlayViewCallbacks)
     configurePageOverlayViewProvider(pdfView, coordinator: coordinator)
     coordinator.bind(
       pdfView: pdfView,
@@ -79,7 +79,7 @@ public struct PDFViewContainer {
     )
   }
 
-  private var pageOverlayCallbacks: PDFPageOverlayViewCallbacks {
+  private var pageOverlayViewCallbacks: PDFPageOverlayViewCallbacks {
     PDFPageOverlayViewCallbacks(
       contentProvider: overlayContentProvider,
       release: overlayRelease

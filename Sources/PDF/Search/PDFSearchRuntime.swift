@@ -6,7 +6,7 @@ import Foundation
 final class PDFSearchRuntime {
   struct RefreshResult {
     let didRefresh: Bool
-    let navigationTarget: PDFPageNavigation.Destination?
+    let navigationTarget: PDFSelection?
   }
 
   struct Snapshot {
@@ -97,7 +97,7 @@ final class PDFSearchRuntime {
     return min(max(requestedSelection, 0), searchSelections.count - 1)
   }
 
-  func focusFirstResultIfNeeded(on pdfView: PDFView?) -> PDFPageNavigation.Destination? {
+  func focusFirstResultIfNeeded(on pdfView: PDFView?) -> PDFSelection? {
     guard currentSelectionIndex == nil else {
       return nil
     }
@@ -105,7 +105,7 @@ final class PDFSearchRuntime {
     return focusSelection(at: 0, on: pdfView)
   }
 
-  func focusSelection(at index: Int, on pdfView: PDFView?) -> PDFPageNavigation.Destination? {
+  func focusSelection(at index: Int, on pdfView: PDFView?) -> PDFSelection? {
     guard let pdfView else {
       return nil
     }
@@ -117,7 +117,7 @@ final class PDFSearchRuntime {
     currentSelectionIndex = index
     let selection = searchSelections[index]
     pdfView.setCurrentSelection(selection, animate: true)
-    return makeNavigationTarget(for: selection)
+    return selection
   }
 
   private func makeHits(from selections: [PDFSelection]) -> [PDFSearchHit] {
@@ -135,17 +135,5 @@ final class PDFSearchRuntime {
         text: selection.string ?? ""
       )
     }
-  }
-
-  private func makeNavigationTarget(for selection: PDFSelection) -> PDFPageNavigation.Destination {
-    guard let page = selection.pages.first else {
-      return PDFPageNavigation.Destination(selection: selection, page: nil, bounds: .null)
-    }
-
-    return PDFPageNavigation.Destination(
-      selection: selection,
-      page: page,
-      bounds: selection.bounds(for: page)
-    )
   }
 }

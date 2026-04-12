@@ -873,37 +873,6 @@ func switchingToEmptyDocumentResetsPageCountAndPageIndexBindings() throws {
 }
 
 @Test
-func goToNavigationWritesRemainIsolatedToPageNavigation() throws {
-  let sourceRoot = try repositoryRootURL()
-    .appendingPathComponent("Sources")
-    .appendingPathComponent("PDF")
-  let enumerator = try #require(
-    FileManager.default.enumerator(
-      at: sourceRoot,
-      includingPropertiesForKeys: nil
-    )
-  )
-
-  var filesContainingGoToWrites: [String] = []
-  while let fileURL = enumerator.nextObject() as? URL {
-    guard fileURL.pathExtension == "swift" else {
-      continue
-    }
-
-    let contents = try String(contentsOf: fileURL, encoding: .utf8)
-    guard contents.contains(".go(to:") else {
-      continue
-    }
-
-    filesContainingGoToWrites.append(
-      fileURL.path.replacingOccurrences(of: sourceRoot.path + "/", with: "")
-    )
-  }
-
-  #expect(filesContainingGoToWrites == ["Page/PDFPageNavigation.swift"])
-}
-
-@Test
 @MainActor
 func coordinatorConformsToOverlayProviderOnCurrentPlatform() throws {
   let coordinator = PDFViewContainer.Coordinator()

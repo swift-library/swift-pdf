@@ -17,8 +17,6 @@ extension PDFViewContainer {
     private var observerPublishers = Set<AnyCancellable>()
 
     private let documentLoader = PDFDocument.Representation.Loader()
-    private let pageStateBindingSynchronizer = PDFPageStateBindingSynchronizer()
-    private let pageNavigation = PDFPageNavigation()
     private let searchRuntime = PDFSearchRuntime()
     private let searchBindingSynchronizer = PDFSearchBindingSynchronizer()
     private let pageOverlayViewLifecycle = PDFPageOverlayViewLifecycle()
@@ -40,7 +38,6 @@ extension PDFViewContainer {
         self.pdfView = pdfView
         installPublishers(for: pdfView)
         documentLoader.resetCachedIdentifier()
-        pageStateBindingSynchronizer.reset()
         searchRuntime.reset()
         searchBindingSynchronizer.reset()
       }
@@ -66,7 +63,6 @@ extension PDFViewContainer {
       pdfView = nil
       pageBindings = PDFPageBindings()
       searchBindings = PDFSearchBindings()
-      pageStateBindingSynchronizer.reset()
       searchRuntime.reset()
       searchBindingSynchronizer.reset()
       documentLoader.resetCachedIdentifier()
@@ -140,21 +136,25 @@ extension PDFViewContainer {
     }
 
     private func refreshPageBindings(applyExternalPage: Bool) {
-      if applyExternalPage {
-        let pageToNavigate = pageStateBindingSynchronizer.externalPageToNavigateIfNeeded(
-          on: pdfView,
-          pageIndexBinding: pageBindings.pageIndex
-        )
-        if let pageToNavigate {
-          pageNavigation.navigate(to: pageToNavigate, on: pdfView)
-        }
+      if applyExternalPage,
+        let pdfView,
+        let requestedPageIndex = pageBindings.pageIndex?.wrappedValue,
+        let destination = pdfView.destination(at: requestedPageIndex)
+      {
+        pdfView.go(to: destination)
       }
 
-      pageStateBindingSynchronizer.publish(
-        on: pdfView,
-        pageIndexBinding: pageBindings.pageIndex,
-        pageCountBinding: pageBindings.pageCount
-      )
+      if let pdfView {
+        pdfView.publish(pageBindings)
+        return
+      }
+
+      if let pageCountBinding = pageBindings.pageCount, pageCountBinding.wrappedValue != 0 {
+        pageCountBinding.wrappedValue = 0
+      }
+      if let pageIndexBinding = pageBindings.pageIndex, pageIndexBinding.wrappedValue != 0 {
+        pageIndexBinding.wrappedValue = 0
+      }
     }
 
     private func refreshSearchBindings() {
@@ -167,11 +167,9 @@ extension PDFViewContainer {
         optionsBinding: searchBindings.options,
         resultsBinding: searchBindings.results,
         navigateToSearchMatch: { [weak self] target in
-          guard let self else {
-            return
+          if let target {
+            self?.pdfView?.go(to: target)
           }
-
-          self.pageNavigation.navigate(to: target, on: self.pdfView)
         }
       )
     }
