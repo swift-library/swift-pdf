@@ -15,7 +15,6 @@ final class PDFSearchBindingDriver {
       options: options,
       selectionIndex: selectionIndex
     )
-
     publish(decision.publication, searchBindings: searchBindings)
     return decision
   }
@@ -30,16 +29,7 @@ final class PDFSearchBindingDriver {
   }
 
   private func write<T: Equatable>(_ binding: Binding<T>?, value: T) {
-    guard let binding, binding.wrappedValue != value else {
-      return
-    }
-
-    // Preserve deterministic publication while allowing a follow-up turn for SwiftUI updates.
+    guard let binding, binding.wrappedValue != value else { return }
     binding.wrappedValue = value
-    Task { @MainActor in
-      if binding.wrappedValue != value {
-        binding.wrappedValue = value
-      }
-    }
   }
 }

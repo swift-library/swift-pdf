@@ -31,8 +31,8 @@ public struct PDFViewContainer {
     coordinator.updatePageOverlayViewCallbacks(pageOverlayViewCallbacks)
     configurePageOverlayViewProvider(pdfView, coordinator: coordinator)
     coordinator.bind(
-      pdfView: pdfView,
-      source: source,
+      view: pdfView,
+      from: source,
       pageBindings: pageBindings,
       searchBindings: searchBindings
     )

@@ -24,15 +24,44 @@ extension PDFView {
     }
   }
 
+  func go(to pageIndex: Int) {
+    let pageCount = document?.pageCount ?? 0
+    guard pageCount > 0 else {
+      return
+    }
+
+    let destinationIndex = pageIndex.clamped(to: pageCount)
+    let currentPageIndex = self.pageIndex
+    guard destinationIndex != currentPageIndex else {
+      return
+    }
+
+    if destinationIndex == currentPageIndex + 1, canGoToNextPage {
+      goToNextPage(nil)
+      return
+    }
+
+    if destinationIndex == currentPageIndex - 1, canGoToPreviousPage {
+      goToPreviousPage(nil)
+      return
+    }
+
+    guard let destination = destination(at: destinationIndex) else {
+      return
+    }
+
+    go(to: destination)
+  }
+
   func destination(at pageIndex: Int) -> PDFDestination? {
     let pageCount = document?.pageCount ?? 0
     guard pageCount > 0 else {
       return nil
     }
 
-    let resolvedPageIndex = pageIndex.clamped(to: pageCount)
-    guard resolvedPageIndex != self.pageIndex,
-      let page = document?.page(at: resolvedPageIndex)
+    let destinationIndex = pageIndex.clamped(to: pageCount)
+    guard destinationIndex != self.pageIndex,
+      let page = document?.page(at: destinationIndex)
     else {
       return nil
     }

@@ -13,11 +13,10 @@ extension PDFViewContainer {
   public final class Coordinator: NSObject {
     private weak var pdfView: PDFView?
 
-    private let pdfViewNotificationPublisher = PDFViewNotificationPublisher()
-    private var observerPublishers = Set<AnyCancellable>()
+    private var publishers = Set<AnyCancellable>()
 
-    private let documentLoader = PDFDocument.Representation.Loader()
-    private var searchEngine = PDFSearchEngine(document: PDFDocument())
+    private let documentLoader = PDFDocument.CachedLoader()
+    private var searchEngine: PDFSearchEngine!
     private let searchBindingDriver = PDFSearchBindingDriver()
     private let pageOverlayViewLifecycle = PDFPageOverlayViewLifecycle()
 
@@ -25,8 +24,8 @@ extension PDFViewContainer {
     private var searchBindings = PDFSearchBindings()
 
     func bind(
-      pdfView: PDFView,
-      source: PDFDocument.Representation,
+      view pdfView: PDFView,
+      from source: PDFDocument.Representation,
       pageBindings: PDFPageBindings,
       searchBindings: PDFSearchBindings
     ) {
@@ -37,22 +36,22 @@ extension PDFViewContainer {
         pageOverlayViewLifecycle.clearOverlayViews()
         self.pdfView = pdfView
         installPublishers(for: pdfView)
-        documentLoader.resetCachedIdentifier()
-        searchEngine = PDFSearchEngine(document: pdfView.document ?? PDFDocument())
+        documentLoader.flush()
+        searchEngine = nil
       }
 
       self.pageBindings = pageBindings
       self.searchBindings = searchBindings
 
-      _ = reloadDocumentIfNeeded(source)
+      if case .documentChanged = documentLoader.load(
+        representation: source,
+        into: pdfView
+      ) {
+        pageOverlayViewLifecycle.clearOverlayViews()
+        searchEngine = pdfView.document.map(PDFSearchEngine.init(document:))
+      }
 
-      refreshPageBindings(applyExternalPage: true)
-      refreshSearchBindings()
-    }
-
-    func loadDocumentIfNeeded(_ source: PDFDocument.Representation) {
-      _ = reloadDocumentIfNeeded(source)
-      refreshPageBindings(applyExternalPage: true)
+      refreshPageBindings(in: pdfView)
       refreshSearchBindings()
     }
 
@@ -62,8 +61,8 @@ extension PDFViewContainer {
       pdfView = nil
       pageBindings = PDFPageBindings()
       searchBindings = PDFSearchBindings()
-      searchEngine = PDFSearchEngine(document: PDFDocument())
-      documentLoader.resetCachedIdentifier()
+      searchEngine = nil
+      documentLoader.flush()
       pageOverlayViewLifecycle.clearOverlayViews()
     }
 
@@ -96,72 +95,52 @@ extension PDFViewContainer {
     private func installPublishers(for pdfView: PDFView) {
       removePublishers()
 
-      pdfViewNotificationPublisher.onPageChanged(
-        for: pdfView,
-        observer: self,
-        storeIn: &observerPublishers,
-        perform: Coordinator.handlePageOrScaleChanged
+      NotificationCenter.default.publisher(
+        for: Notification.Name.PDFViewPageChanged,
+        object: pdfView
       )
+      .sink { [weak self] _ in
+        MainActor.assumeIsolated {
+          self.map { pdfView.publish($0.pageBindings) }
+        }
+      }
+      .store(in: &publishers)
 
-      pdfViewNotificationPublisher.onScaleChanged(
-        for: pdfView,
-        observer: self,
-        storeIn: &observerPublishers,
-        perform: Coordinator.handlePageOrScaleChanged
+      NotificationCenter.default.publisher(
+        for: Notification.Name.PDFViewScaleChanged,
+        object: pdfView
       )
+      .sink { [weak self] _ in
+        MainActor.assumeIsolated {
+          self.map { pdfView.publish($0.pageBindings) }
+        }
+      }
+      .store(in: &publishers)
     }
 
     private func removePublishers() {
-      observerPublishers.removeAll()
+      publishers.removeAll()
     }
 
-    private func handlePageOrScaleChanged() {
-      refreshPageBindings(applyExternalPage: false)
-    }
-
-    @discardableResult
-    private func reloadDocumentIfNeeded(_ source: PDFDocument.Representation) -> Bool {
-      let didLoad = documentLoader.load(
-        representation: source,
-        into: pdfView
-      )
-      guard didLoad else {
-        return false
+    private func refreshPageBindings(in pdfView: PDFView) {
+      if let pageIndex = pageBindings.pageIndex?.wrappedValue {
+        pdfView.go(to: pageIndex)
       }
 
-      searchEngine = PDFSearchEngine(document: pdfView?.document ?? PDFDocument())
-      return true
-    }
-
-    private func refreshPageBindings(applyExternalPage: Bool) {
-      if applyExternalPage,
-        let pdfView,
-        let requestedPageIndex = pageBindings.pageIndex?.wrappedValue,
-        let destination = pdfView.destination(at: requestedPageIndex)
-      {
-        pdfView.go(to: destination)
-      }
-
-      if let pdfView {
-        pdfView.publish(pageBindings)
-        return
-      }
-
-      if let pageCountBinding = pageBindings.pageCount, pageCountBinding.wrappedValue != 0 {
-        pageCountBinding.wrappedValue = 0
-      }
-      if let pageIndexBinding = pageBindings.pageIndex, pageIndexBinding.wrappedValue != 0 {
-        pageIndexBinding.wrappedValue = 0
-      }
+      pdfView.publish(pageBindings)
     }
 
     private func refreshSearchBindings() {
-      let searchDecision = searchBindingDriver.performFind(
+      guard let searchEngine else {
+        return
+      }
+
+      let decision = searchBindingDriver.performFind(
         engine: searchEngine,
         searchBindings: searchBindings
       )
 
-      switch searchDecision {
+      switch decision {
       case .publish:
         break
       case .clearSelection:
