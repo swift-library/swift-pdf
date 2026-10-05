@@ -95,22 +95,25 @@ extension PDFTests {
         proxy: proxy
       )
 
+      // UIKit's PDFView navigates to the first page itself when it receives a document.
+      let baseline = pdfView.goToPageCallCount
+
       proxy.goToPage(at: 1)
 
-      #expect(pdfView.goToPageCallCount == 1)
+      #expect(pdfView.goToPageCallCount == baseline + 1)
       #expect(pdfView.goToPreviousPageCallCount == 0)
       #expect(pdfView.goToDestinationCallCount == 0)
       #expect(pdfView.goToNextPageCallCount == 0)
 
       proxy.goToPage(at: 0)
 
-      #expect(pdfView.goToPageCallCount == 2)
+      #expect(pdfView.goToPageCallCount == baseline + 2)
       #expect(pdfView.goToDestinationCallCount == 0)
       #expect(pdfView.goToPreviousPageCallCount == 0)
 
       proxy.goToPage(at: 2)
 
-      #expect(pdfView.goToPageCallCount == 3)
+      #expect(pdfView.goToPageCallCount == baseline + 3)
       #expect(pdfView.goToDestinationCallCount == 0)
     }
 
