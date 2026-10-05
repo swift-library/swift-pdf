@@ -3,9 +3,9 @@ import SwiftUI
 
 /// A namespace for PDF-specific extensions.
 public struct PDFViewBase<Base> {
-  public let base: Base
+  let base: Base
 
-  public init(_ base: Base) {
+  init(_ base: Base) {
     self.base = base
   }
 }

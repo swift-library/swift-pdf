@@ -15,7 +15,7 @@ enum PDFBindingPublicationTiming {
 
 extension PDFViewContainer {
   @MainActor
-  public final class Coordinator: NSObject {
+  final class Coordinator: NSObject {
     private weak var pdfView: PDFView?
     private var proxy: PDFViewProxy? {
       didSet {

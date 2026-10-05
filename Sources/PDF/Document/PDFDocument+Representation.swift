@@ -7,7 +7,7 @@ extension PDFDocument {
     case data(Data)
     case fileURL(URL)
 
-    public func resolveDocument() -> PDFDocument? {
+    func resolveDocument() -> PDFDocument? {
       switch self {
       case .document(let document):
         return document

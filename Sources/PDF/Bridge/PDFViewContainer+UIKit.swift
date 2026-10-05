@@ -5,19 +5,19 @@
 
   @MainActor
   extension PDFViewContainer: UIViewRepresentable {
-    public func makeCoordinator() -> Coordinator {
+    func makeCoordinator() -> Coordinator {
       Coordinator()
     }
 
-    public func makeUIView(context: Context) -> PDFView {
+    func makeUIView(context: Context) -> PDFView {
       makePDFView(bindingWith: context.coordinator)
     }
 
-    public func updateUIView(_ pdfView: PDFView, context: Context) {
+    func updateUIView(_ pdfView: PDFView, context: Context) {
       updatePDFView(pdfView, bindingWith: context.coordinator)
     }
 
-    public static func dismantleUIView(_ uiView: PDFView, coordinator: Coordinator) {
+    static func dismantleUIView(_ uiView: PDFView, coordinator: Coordinator) {
       coordinator.detach()
     }
   }

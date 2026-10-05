@@ -5,25 +5,21 @@
 import PackageDescription
 
 let package = Package(
-  name: "swift-pdf",
+  name: "PDFViewer",
   platforms: [
     .iOS(.v18),
     .macOS(.v15),
     .visionOS(.v2),
   ],
-  products: [
-    .library(
-      name: "PDF",
-      targets: ["PDF"]
-    )
+  dependencies: [
+    .package(name: "swift-pdf", path: "../..")
   ],
   targets: [
-    .target(
-      name: "PDF"
-    ),
-    .testTarget(
-      name: "PDFTests",
-      dependencies: ["PDF"]
-    ),
+    .executableTarget(
+      name: "PDFViewer",
+      dependencies: [
+        .product(name: "PDF", package: "swift-pdf")
+      ]
+    )
   ]
 )
