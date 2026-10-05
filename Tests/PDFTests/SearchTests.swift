@@ -158,7 +158,7 @@ extension PDFTests {
       let coordinator = PDFViewContainer.Coordinator()
       let pdfView = PDFView()
 
-      let queryBox = StringBindingBox("Quartz")
+      let queryBox = StringBindingBox("fixture")
       let searchResultIndexBox = OptionalIntBindingBox(nil)
       let resultCountBox = IntBindingBox(0)
       let optionsBox = SearchOptionsBindingBox([.caseInsensitive])
@@ -293,7 +293,7 @@ extension PDFTests {
 
       let currentPageBox = IntBindingBox(0)
       let pageCountBox = IntBindingBox(0)
-      let queryBox = StringBindingBox("Quartz")
+      let queryBox = StringBindingBox("fixture")
       let searchResultIndexBox = OptionalIntBindingBox(nil)
       let resultCountBox = IntBindingBox(0)
 
@@ -327,7 +327,7 @@ extension PDFTests {
       )
       await flushMainActorTasks()
 
-      #expect(queryBox.value == "Quartz")
+      #expect(queryBox.value == "fixture")
       #expect(resultCountBox.value == initialResultCount)
       #expect(searchResultIndexBox.value == initialSearchResultIndex)
     }

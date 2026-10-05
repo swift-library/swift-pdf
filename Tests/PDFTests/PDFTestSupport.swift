@@ -1,3 +1,4 @@
+import CoreText
 import Foundation
 import PDFKit
 import SwiftUI
@@ -261,35 +262,39 @@ final class NonDispatchingPDFView: PDFView {
 }
 
 func fixturePDFURL() throws -> URL {
-  let fixtureURL = try repositoryRootURL()
-    .appendingPathComponent("Tests/PDFTests/Fixtures/drawingwithquartz2d.pdf")
-
-  guard FileManager.default.fileExists(atPath: fixtureURL.path) else {
-    throw NSError(
-      domain: "PDFTests",
-      code: 1,
-      userInfo: [NSLocalizedDescriptionKey: "Fixture file not found at \(fixtureURL.path)"]
-    )
-  }
-
-  return fixtureURL
+  let url = FileManager.default.temporaryDirectory
+    .appendingPathComponent("swift-pdf-fixture-\(UUID().uuidString).pdf")
+  try fixturePDFData().write(to: url)
+  return url
 }
 
-func repositoryRootURL() throws -> URL {
-  let testFileURL = URL(fileURLWithPath: #filePath)
-  let repositoryRoot =
-    testFileURL
-    .deletingLastPathComponent()
-    .deletingLastPathComponent()
-    .deletingLastPathComponent()
-
-  guard FileManager.default.fileExists(atPath: repositoryRoot.path) else {
-    throw NSError(
-      domain: "PDFTests",
-      code: 2,
-      userInfo: [NSLocalizedDescriptionKey: "Repository root not found at \(repositoryRoot.path)"]
-    )
+/// A generated multi-page document whose pages carry searchable text.
+func fixturePDFData(pageCount: Int = 4) -> Data {
+  let data = NSMutableData()
+  var mediaBox = CGRect(x: 0, y: 0, width: 612, height: 792)
+  guard
+    let consumer = CGDataConsumer(data: data as CFMutableData),
+    let context = CGContext(consumer: consumer, mediaBox: &mediaBox, nil)
+  else {
+    return Data()
   }
-
-  return repositoryRoot
+  let font = CTFontCreateWithName("Helvetica" as CFString, 18, nil)
+  for index in 0..<pageCount {
+    context.beginPDFPage(nil)
+    let lines = [
+      "Page \(index + 1) of the generated fixture.",
+      "An Apple a day keeps the viewer busy.",
+    ]
+    for (offset, line) in lines.enumerated() {
+      let text = NSAttributedString(
+        string: line,
+        attributes: [NSAttributedString.Key(kCTFontAttributeName as String): font]
+      )
+      context.textPosition = CGPoint(x: 72, y: 720 - CGFloat(offset) * 28)
+      CTLineDraw(CTLineCreateWithAttributedString(text), context)
+    }
+    context.endPDFPage()
+  }
+  context.closePDF()
+  return data as Data
 }

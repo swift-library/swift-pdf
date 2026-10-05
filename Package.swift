@@ -26,8 +26,7 @@ let package = Package(
     ),
     .testTarget(
       name: "PDFTests",
-      dependencies: ["PDF"],
-      exclude: ["Fixtures/drawingwithquartz2d.pdf"]
+      dependencies: ["PDF"]
     ),
   ]
 )
