@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0 WITH Swift-exception
+# Copyright (c) 2026 Xudong Xu
+
+"""Compile PDF documentation, check public topics and type-check its Swift snippets."""
+
+import argparse
+from collections import Counter
+import hashlib
+import json
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import tarfile
+import tempfile
+
+
+def capture(root, *command):
+    return subprocess.check_output(command, cwd=root, text=True).strip()
+
+
+def check_topics(catalog, graphs):
+    links = set(re.findall(r"^- ``([^`]+)``\s*$", (catalog / "PDF.md").read_text(), re.MULTILINE))
+    symbols = {}
+    for graph in graphs:
+        for symbol in json.loads(graph.read_text())["symbols"]:
+            if symbol["kind"]["identifier"] != "swift.extension":
+                symbols[symbol["identifier"]["precise"]] = "/".join(symbol["pathComponents"])
+    paths = Counter(symbols.values())
+    for path, count in paths.items():
+        matches = {link for link in links if any(
+            value == path or value.startswith(path + "-")
+            for value in (link, link.removeprefix("PDF/"), link.partition("/")[2])
+        )}
+        if len(matches) < count:
+            raise RuntimeError("Landing page Topics must cover every overload of " + path)
+    return len(symbols)
+
+
+def check_snippets(root, catalog, output):
+    binary = Path(capture(root, "swift", "build", "--show-bin-path"))
+    manifest = json.loads(capture(root, "swift", "package", "dump-package"))
+    floor = next(value["version"] for value in manifest["platforms"] if value["platformName"] == "macos")
+    target = json.loads(capture(root, "swift", "-print-target-info"))["target"]["unversionedTriple"] + floor
+    sdk = capture(root, "xcrun", "--sdk", "macosx", "--show-sdk-path")
+    snippets = []
+    with tempfile.TemporaryDirectory(prefix="snippets-", dir=root / ".build/documentation") as temporary:
+        with (output / "documentation-snippets.log").open("w") as log:
+            for article in sorted(catalog.rglob("*.md")):
+                for index, match in enumerate(re.finditer(r"^```swift\s*\n(.*?)^```\s*$", article.read_text(),
+                                                         re.MULTILINE | re.DOTALL), start=1):
+                    source = Path(temporary) / (article.stem + "-" + str(index) + ".swift")
+                    source.write_text(match[1])
+                    subprocess.run([
+                        "xcrun", "swiftc", "-typecheck", "-swift-version", "6", "-warnings-as-errors",
+                        "-module-name", "PDFDocumentationSnippet", "-target", target, "-sdk", sdk,
+                        "-I", str(binary / "Modules"), "-I", str(binary), str(source),
+                    ], cwd=root, stdout=log, stderr=subprocess.STDOUT, check=True)
+                    snippets.append({"article": article.relative_to(catalog).as_posix(), "index": index,
+                                     "sha256": hashlib.sha256(source.read_bytes()).hexdigest()})
+    if not snippets:
+        raise RuntimeError("The documentation catalog must contain Swift usage snippets")
+    return snippets
+
+
+def main():
+    argparse.ArgumentParser(description=__doc__).parse_args()
+    root = Path(__file__).resolve().parent.parent
+    output = root / ".build/release-validation"
+    output.mkdir(parents=True, exist_ok=True)
+    result = subprocess.run(
+        ["swift", "package", "--force-resolved-versions", "dump-symbol-graph", "--skip-synthesized-members"],
+        cwd=root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+    )
+    (output / "docc-symbolgraph.log").write_text(result.stdout)
+    if result.returncode:
+        raise RuntimeError("Symbol extraction failed; inspect .build/release-validation/docc-symbolgraph.log")
+    matches = re.findall(r"^Files written to (.+)$", result.stdout, re.MULTILINE)
+    if len(matches) != 1:
+        raise RuntimeError("Symbol extraction did not identify its output directory")
+    graphs = Path(matches[0])
+    selected = [graphs / "PDF.symbols.json", *sorted(graphs.glob("PDF@*.symbols.json"))]
+    catalog = root / "Sources/PDF/PDF.docc"
+    workspace = root / ".build/documentation"
+    workspace.mkdir(parents=True, exist_ok=True)
+    snippets = check_snippets(root, catalog, output)
+    with tempfile.TemporaryDirectory(prefix="symbols-", dir=workspace) as temporary:
+        symbols = Path(temporary)
+        for path in selected:
+            shutil.copy2(path, symbols / path.name)
+        command = [
+            "xcrun", "docc", "convert", str(catalog), "--additional-symbol-graph-dir", str(symbols),
+            "--output-path", str(workspace / "PDF.doccarchive"), "--warnings-as-errors",
+        ]
+        with (output / "docc.log").open("w") as log:
+            subprocess.run(command, cwd=root, stdout=log, stderr=subprocess.STDOUT, check=True)
+    public_count = check_topics(catalog, selected)
+    archive = output / "PDF.doccarchive.tar.gz"
+    with tarfile.open(archive, "w:gz") as bundle:
+        bundle.add(workspace / "PDF.doccarchive", arcname="PDF.doccarchive")
+    evidence = {
+        "checker_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "symbol_graphs": {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in selected},
+        "public_symbol_count": public_count, "snippets": snippets,
+        "archive": archive.name, "archive_sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
+        "checks": ["public-symbol-extraction", "public-topics-coverage", "documentation-snippets",
+                   "docc-warnings-as-errors"],
+    }
+    (output / "documentation.json").write_text(json.dumps(evidence, indent=2) + "\n")
+    print("DocC compilation passed; " + str(public_count) + " public symbols and "
+          + str(len(snippets)) + " Swift snippets checked")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+        print("check-docs: " + str(error), file=sys.stderr)
+        sys.exit(1)

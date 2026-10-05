@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0 WITH Swift-exception
+# Copyright (c) 2026 Xudong Xu
+
+"""Prepare simulator runtimes and concrete devices for the selected Xcode."""
+
+import argparse
+import json
+from pathlib import Path
+import platform
+import subprocess
+import sys
+
+
+PLATFORMS = {
+    "iOS": ("iphonesimulator", "iOS-", "iOS Simulator", "iPhone"),
+    "visionOS": ("xrsimulator", "xrOS-", "visionOS Simulator", "Apple Vision"),
+}
+
+
+def capture(*command):
+    return subprocess.check_output(command, text=True).strip()
+
+
+def matching_runtimes(name, version):
+    prefix = "com.apple.CoreSimulator.SimRuntime." + PLATFORMS[name][1]
+    runtimes = json.loads(capture("xcrun", "simctl", "list", "runtimes", "--json"))["runtimes"]
+    return sorted(
+        (runtime for runtime in runtimes if runtime.get("isAvailable")
+         and runtime["identifier"].startswith(prefix) and runtime["version"] == version),
+        key=lambda runtime: runtime["identifier"],
+    )
+
+
+def select_device(name, runtime):
+    devices = json.loads(capture("xcrun", "simctl", "list", "devices", "available", "--json"))["devices"]
+    candidates = [device for device in devices.get(runtime["identifier"], [])
+                  if device.get("isAvailable")]
+    family = PLATFORMS[name][3]
+    types = sorted(runtime.get("supportedDeviceTypes", []), key=lambda value: value["identifier"])
+    preferred = {value["identifier"] for value in types if value.get("productFamily") == family}
+    type_names = {value["identifier"]: value.get("name") for value in types}
+    if candidates:
+        return min(candidates, key=lambda value: (
+            value.get("deviceTypeIdentifier") not in preferred,
+            value["name"] != type_names.get(value.get("deviceTypeIdentifier")),
+            value["name"], value["udid"],
+        ))
+    if not preferred:
+        raise RuntimeError("No supported device type for " + name)
+    device_type = min(preferred)
+    device_name = "PDF validation " + name + " " + runtime["version"]
+    udid = capture("xcrun", "simctl", "create", device_name, device_type, runtime["identifier"])
+    return {"name": device_name, "udid": udid, "deviceTypeIdentifier": device_type}
+
+
+def prepare(name, download=True):
+    sdk = PLATFORMS[name][0]
+    version = capture("xcrun", "--sdk", sdk, "--show-sdk-version")
+    runtimes = matching_runtimes(name, version)
+    if not runtimes and download:
+        subprocess.run([
+            "xcodebuild", "-downloadPlatform", name, "-buildVersion", version,
+            "-architectureVariant", "arm64" if platform.machine() == "arm64" else "universal",
+        ], check=True)
+        runtimes = matching_runtimes(name, version)
+    if not runtimes:
+        raise RuntimeError("No " + name + " runtime matching SDK " + version
+                           + "; run Scripts/prepare-ci-platforms")
+    runtime = runtimes[0]
+    device = select_device(name, runtime)
+    return {
+        "platform": name, "sdk": sdk, "sdk_version": version,
+        "runtime": {key: runtime[key] for key in ("identifier", "version", "buildversion")},
+        "device": {key: device[key] for key in ("name", "udid", "deviceTypeIdentifier")},
+        "destination": "platform=" + PLATFORMS[name][2] + ",id=" + device["udid"],
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--test-destination", action="store_true",
+                        help="Select an installed iOS device and print its destination without downloading")
+    args = parser.parse_args()
+    root = Path(__file__).resolve().parent.parent
+    output = root / ".build/release-validation"
+    output.mkdir(parents=True, exist_ok=True)
+    if args.test_destination:
+        evidence = prepare("iOS", download=False)
+        (output / "ios-test-destination.json").write_text(json.dumps(evidence, indent=2) + "\n")
+        print(evidence["destination"])
+    else:
+        evidence = {"platforms": [prepare(name) for name in PLATFORMS]}
+        (output / "platform-components.json").write_text(json.dumps(evidence, indent=2) + "\n")
+        for value in evidence["platforms"]:
+            print(value["platform"] + " SDK " + value["sdk_version"] + ": " + value["destination"])
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+        print("prepare-ci-platforms: " + str(error), file=sys.stderr)
+        sys.exit(1)

@@ -36,7 +36,8 @@ enum SampleDocument {
     return data as Data
   }
 
-  private static func draw(_ string: String, font: CTFont, at point: CGPoint, in context: CGContext) {
+  private static func draw(_ string: String, font: CTFont, at point: CGPoint, in context: CGContext)
+  {
     let text = NSAttributedString(
       string: string,
       attributes: [NSAttributedString.Key(kCTFontAttributeName as String): font]

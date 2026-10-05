@@ -1,0 +1,76 @@
+#!/bin/bash
+# SPDX-License-Identifier: Apache-2.0 WITH Swift-exception
+# Copyright (c) 2026 Xudong Xu
+set -euo pipefail
+cd "$(dirname "$0")/.."
+case "${1:-all}" in
+  all) export RELEASE_CHECK_SCOPE=all ;;
+  --format-check) export RELEASE_CHECK_SCOPE=format ;;
+  --compiler-check) export RELEASE_CHECK_SCOPE=compiler ;;
+  *) echo 'Usage: Scripts/check [--format-check|--compiler-check]' >&2; exit 2 ;;
+esac
+mkdir -p .build/release-validation
+Scripts/validate-version --json > .build/release-validation/version.json
+swift package dump-package > .build/release-validation/package.json
+python3 - <<'PY'
+import json, pathlib
+config = json.loads(pathlib.Path('.github/release.json').read_text())
+package = json.loads(pathlib.Path('.build/release-validation/package.json').read_text())
+platforms = {p['platformName'].lower(): p['version'] for p in package['platforms']}
+expected = {name.lower(): str(min(generations)) + '.0' for name, generations in config['platforms'].items()}
+if platforms != expected:
+    raise SystemExit('Deployment minimum differs from the reviewed platform window')
+if package['toolsVersion']['_version'] != config['minimum_swift'] + '.0':
+    raise SystemExit('Swift tools minimum differs from the declared compiler policy')
+PY
+if [ "$RELEASE_CHECK_SCOPE" = all ] || [ "$RELEASE_CHECK_SCOPE" = format ]; then
+  xcrun swift-format lint --strict --configuration .swift-format --recursive \
+    Package.swift Sources Tests Examples/PDFViewer/Package.swift Examples/PDFViewer/Sources
+fi
+if [ "$RELEASE_CHECK_SCOPE" = all ] || [ "$RELEASE_CHECK_SCOPE" = compiler ]; then
+  python3 -B -m unittest discover -s Tests/ReleaseTools
+  swift test --force-resolved-versions
+  swift build -c release --force-resolved-versions
+  Scripts/check-docs
+  ios_destination="$(Scripts/prepare-ci-platforms --test-destination)"
+  export PDF_TEST_RESULT_BUNDLE="$(python3 -c 'import uuid; print(".build/release-validation/ios-tests-" + uuid.uuid4().hex + ".xcresult")')"
+  echo "Testing on $ios_destination"
+  xcodebuild test -scheme swift-pdf -destination "$ios_destination" \
+    -derivedDataPath .build/xcode/ios -resultBundlePath "$PDF_TEST_RESULT_BUNDLE" \
+    > .build/release-validation/ios-tests.log 2>&1
+  echo 'Building for visionOS Simulator'
+  xcodebuild build -scheme swift-pdf -destination 'generic/platform=visionOS Simulator' \
+    -derivedDataPath .build/xcode/visionos \
+    > .build/release-validation/visionos-build.log 2>&1
+  swift build --package-path Examples/PDFViewer --force-resolved-versions
+fi
+python3 - <<'PY'
+import hashlib, json, os, pathlib, platform, subprocess
+root = pathlib.Path('.build/release-validation')
+result = json.loads((root / 'version.json').read_text())
+result['os'] = platform.platform()
+result['swift'] = subprocess.check_output(['swift', '--version'], text=True).strip()
+result['xcode'] = subprocess.check_output(['xcodebuild', '-version'], text=True).strip()
+result['sdks'] = {sdk: subprocess.check_output(['xcrun', '--sdk', sdk, '--show-sdk-version'], text=True).strip()
+                  for sdk in ('macosx', 'iphonesimulator', 'xrsimulator')}
+result['validation_script_sha256'] = hashlib.sha256(pathlib.Path('Scripts/check').read_bytes()).hexdigest()
+result['format_configuration_sha256'] = hashlib.sha256(pathlib.Path('.swift-format').read_bytes()).hexdigest()
+result['checks'] = ['version', 'manifest-requirements']
+scope = os.environ['RELEASE_CHECK_SCOPE']
+result['scope'] = scope
+if scope in ('all', 'format'):
+    result['checks'] += ['strict-format']
+    result['formatter'] = subprocess.check_output(['xcrun', 'swift-format', '--version'], text=True).strip()
+if scope in ('all', 'compiler'):
+    result['checks'] += ['release-tools', 'swift-test', 'release-build', 'docc', 'documentation-snippets',
+                         'ios-simulator-tests', 'visionos-simulator-build', 'pdfviewer-build']
+    result['documentation'] = json.loads((root / 'documentation.json').read_text())
+    result['ios_simulator'] = json.loads((root / 'ios-test-destination.json').read_text())
+    result['test_result_bundle'] = os.environ['PDF_TEST_RESULT_BUNDLE']
+    components = root / 'platform-components.json'
+    if components.exists():
+        result['platform_components'] = json.loads(components.read_text())
+    result['platform_preparation_sha256'] = hashlib.sha256(pathlib.Path('Scripts/prepare-ci-platforms').read_bytes()).hexdigest()
+(root / 'provenance.json').write_text(json.dumps(result, indent=2) + '\n')
+PY
+echo 'checks ok'
