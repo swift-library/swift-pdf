@@ -1,9 +1,19 @@
 import SwiftUI
 
+@MainActor
+struct PDFPageOverlayContentProviderEnvironmentValue {
+  let provider: PDFPageOverlayViewContentProvider
+}
+
+@MainActor
+struct PDFPageOverlayReleaseEnvironmentValue {
+  let release: PDFPageOverlayViewRelease
+}
+
 extension EnvironmentValues {
   @Entry
-  var pageOverlayContentProvider: PDFPageOverlayViewContentProvider = { _ in nil }
+  var pageOverlayContentProvider: PDFPageOverlayContentProviderEnvironmentValue?
 
   @Entry
-  var pageOverlayRelease: PDFPageOverlayViewRelease = { _ in }
+  var pageOverlayRelease: PDFPageOverlayReleaseEnvironmentValue?
 }

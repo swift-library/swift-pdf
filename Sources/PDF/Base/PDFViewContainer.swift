@@ -27,33 +27,44 @@ public struct PDFViewContainer {
 
   private func configure(
     _ pdfView: PDFView,
-    bindingWith coordinator: Coordinator
+    bindingWith coordinator: Coordinator,
+    bindingPublicationTiming: PDFBindingPublicationTiming
   ) {
     pdfView.configure(using: resolvedConfiguration)
     coordinator.updatePageOverlayViewCallbacks(pageOverlayViewCallbacks)
-    coordinator.configurePageOverlayViewProvider(in: pdfView)
     coordinator.bind(
       view: pdfView,
       from: source,
       pageBindings: pageBindings,
       searchBindings: searchBindings,
-      proxy: proxy
+      proxy: proxy,
+      bindingPublicationTiming: bindingPublicationTiming
     )
   }
 
   func makePDFView(
-    bindingWith coordinator: Coordinator
+    bindingWith coordinator: Coordinator,
+    bindingPublicationTiming: PDFBindingPublicationTiming = .immediate
   ) -> PDFView {
     let pdfView = PDFView()
-    configure(pdfView, bindingWith: coordinator)
+    configure(
+      pdfView,
+      bindingWith: coordinator,
+      bindingPublicationTiming: bindingPublicationTiming
+    )
     return pdfView
   }
 
   func updatePDFView(
     _ pdfView: PDFView,
-    bindingWith coordinator: Coordinator
+    bindingWith coordinator: Coordinator,
+    bindingPublicationTiming: PDFBindingPublicationTiming = .immediate
   ) {
-    configure(pdfView, bindingWith: coordinator)
+    configure(
+      pdfView,
+      bindingWith: coordinator,
+      bindingPublicationTiming: bindingPublicationTiming
+    )
   }
 
   private var resolvedConfiguration: PDFViewConfiguration {
@@ -85,8 +96,8 @@ public struct PDFViewContainer {
 
   private var pageOverlayViewCallbacks: PDFPageOverlayViewCallbacks {
     PDFPageOverlayViewCallbacks(
-      contentProvider: overlayContentProvider,
-      release: overlayRelease
+      contentProvider: overlayContentProvider?.provider,
+      release: overlayRelease?.release
     )
   }
 }

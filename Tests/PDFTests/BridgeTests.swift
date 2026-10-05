@@ -369,5 +369,125 @@ extension PDFTests {
       #expect(events[..<firstSearchEventIndex].contains("pageCount"))
       #expect(events[..<firstSearchEventIndex].contains("currentPage"))
     }
+
+    @Test
+    func nextMainActorTurnPublicationDefersBindingsAndPreservesOwnerOrder() async throws {
+      let document = try #require(PDFDocument(url: fixturePDFURL()))
+      let secondPage = try #require(document.page(at: 1))
+      let coordinator = PDFViewContainer.Coordinator()
+      let pdfView = NonDispatchingPDFView()
+
+      var currentPageValue = 0
+      var pageCountValue = 0
+      var queryValue = "the"
+      var searchResultIndexValue: Int? = nil
+      var resultCountValue = 0
+      var optionsValue: NSString.CompareOptions = [.caseInsensitive]
+      var resultsValue: [PDFSearchResult] = []
+      var events: [String] = []
+
+      bindCoordinator(
+        coordinator,
+        pdfView: pdfView,
+        initialSource: .document(document),
+        currentPageBinding: Binding(
+          get: { currentPageValue },
+          set: {
+            currentPageValue = $0
+            events.append("currentPage")
+          }
+        ),
+        pageCountBinding: Binding(
+          get: { pageCountValue },
+          set: {
+            pageCountValue = $0
+            events.append("pageCount")
+          }
+        ),
+        searchQueryBinding: Binding(
+          get: { queryValue },
+          set: { queryValue = $0 }
+        ),
+        searchResultIndexBinding: Binding(
+          get: { searchResultIndexValue },
+          set: {
+            searchResultIndexValue = $0
+            events.append("searchResultIndex")
+          }
+        ),
+        searchResultCountBinding: Binding(
+          get: { resultCountValue },
+          set: {
+            resultCountValue = $0
+            events.append("searchResultCount")
+          }
+        ),
+        searchOptionsBinding: Binding(
+          get: { optionsValue },
+          set: { optionsValue = $0 }
+        ),
+        searchResultsBinding: Binding(
+          get: { resultsValue },
+          set: {
+            resultsValue = $0
+            events.append("searchResults")
+          }
+        ),
+        bindingPublicationTiming: .nextMainActorTurn
+      )
+
+      #expect(events.isEmpty)
+      #expect(pageCountValue == 0)
+      #expect(resultCountValue == 0)
+
+      await flushMainActorTasks()
+      await flushMainActorTasks()
+
+      let firstSearchEventIndex = try #require(events.firstIndex { $0.hasPrefix("search") })
+      #expect(events.first == "pageCount")
+      #expect(events[..<firstSearchEventIndex].contains("pageCount"))
+      #expect(pageCountValue == document.pageCount)
+      #expect(resultCountValue > 0)
+
+      events.removeAll()
+      pdfView.go(to: secondPage)
+      NotificationCenter.default.post(name: .PDFViewPageChanged, object: pdfView)
+
+      #expect(currentPageValue == 0)
+      #expect(events.isEmpty)
+
+      await flushMainActorTasks()
+
+      #expect(currentPageValue == 1)
+      #expect(events.contains("currentPage"))
+    }
+
+    @Test
+    func detachCancelsNextMainActorTurnBindingPublication() async throws {
+      let document = try #require(PDFDocument(url: fixturePDFURL()))
+      let coordinator = PDFViewContainer.Coordinator()
+      let pdfView = PDFView()
+      let pageCountBox = IntBindingBox(0)
+      let resultCountBox = IntBindingBox(0)
+      let queryBox = StringBindingBox("the")
+
+      bindCoordinator(
+        coordinator,
+        pdfView: pdfView,
+        initialSource: .document(document),
+        currentPageBinding: nil,
+        pageCountBinding: makeBinding(for: pageCountBox),
+        searchQueryBinding: makeBinding(for: queryBox),
+        searchResultCountBinding: makeBinding(for: resultCountBox),
+        bindingPublicationTiming: .nextMainActorTurn
+      )
+      coordinator.detach()
+
+      await flushMainActorTasks()
+
+      #expect(pageCountBox.value == 0)
+      #expect(resultCountBox.value == 0)
+    }
+
   }
 }

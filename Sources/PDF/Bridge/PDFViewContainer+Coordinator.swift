@@ -8,6 +8,11 @@ import SwiftUI
   import AppKit
 #endif
 
+enum PDFBindingPublicationTiming {
+  case immediate
+  case nextMainActorTurn
+}
+
 extension PDFViewContainer {
   @MainActor
   public final class Coordinator: NSObject {
@@ -25,6 +30,9 @@ extension PDFViewContainer {
     }
 
     private var publishers = Set<AnyCancellable>()
+    private var bindingPublicationTiming = PDFBindingPublicationTiming.immediate
+    private var deferredPagePublicationTask: Task<Void, Never>?
+    private var deferredBindingSynchronizationTask: Task<Void, Never>?
 
     private let documentLoader = PDFDocument.CachedLoader()
     private let searchBindingDriver = PDFSearchBindingDriver()
@@ -39,11 +47,13 @@ extension PDFViewContainer {
       from source: PDFDocument.Representation,
       pageBindings: PDFPageBindings,
       searchBindings: PDFSearchBindings,
-      proxy: PDFViewProxy?
+      proxy: PDFViewProxy?,
+      bindingPublicationTiming: PDFBindingPublicationTiming = .immediate
     ) {
       let viewChanged = self.pdfView !== pdfView
 
       if viewChanged {
+        cancelDeferredBindingPublications()
         removePublishers()
         relay = nil
         pageOverlayViewLifecycle.clearOverlayViews()
@@ -55,19 +65,26 @@ extension PDFViewContainer {
         searchEngine = nil
       }
 
+      self.bindingPublicationTiming = bindingPublicationTiming
       self.pageBindings = pageBindings
       self.searchBindings = searchBindings
 
-      if case .documentChanged = documentLoader.load(
+      let documentLoadResult = documentLoader.load(
         representation: source,
         into: pdfView
-      ) {
+      )
+      let documentChanged: Bool
+      if case .documentChanged = documentLoadResult {
         pageOverlayViewLifecycle.clearOverlayViews()
         searchEngine = pdfView.document.map(PDFSearchEngine.init(document:))
-        configurePageOverlayViewProvider(in: pdfView)
+        documentChanged = true
       } else if searchEngine == nil {
         searchEngine = pdfView.document.map(PDFSearchEngine.init(document:))
+        documentChanged = false
+      } else {
+        documentChanged = false
       }
+      configurePageOverlayViewProvider(in: pdfView, forceRewire: documentChanged)
 
       self.proxy = proxy
       self.relay = PDFViewProxyRelay(
@@ -77,11 +94,11 @@ extension PDFViewContainer {
         searchBindingDriver: searchBindingDriver,
         searchEngine: searchEngine
       )
-      pdfView.publishState(pageBindings)
-      refreshSearchBindings(in: pdfView)
+      synchronizeBindings(in: pdfView)
     }
 
     func detach() {
+      cancelDeferredBindingPublications()
       removePublishers()
       relay = nil
 
@@ -93,6 +110,7 @@ extension PDFViewContainer {
       documentLoader.flush()
       searchBindingDriver.reset()
       pageOverlayViewLifecycle.clearOverlayViews()
+      bindingPublicationTiming = .immediate
     }
 
     func updatePageOverlayViewCallbacks(_ callbacks: PDFPageOverlayViewCallbacks) {
@@ -130,7 +148,7 @@ extension PDFViewContainer {
       )
       .sink { [weak self] _ in
         MainActor.assumeIsolated {
-          self.map { pdfView.publishState($0.pageBindings) }
+          self?.publishPageState(in: pdfView)
         }
       }
       .store(in: &publishers)
@@ -141,7 +159,7 @@ extension PDFViewContainer {
       )
       .sink { [weak self] _ in
         MainActor.assumeIsolated {
-          self.map { pdfView.publishState($0.pageBindings) }
+          self?.publishPageState(in: pdfView)
         }
       }
       .store(in: &publishers)
@@ -157,7 +175,7 @@ extension PDFViewContainer {
             // initial command dispatch. Listen to visible-page changes so SwiftUI page
             // bindings stay attached to PDFView's actual settled page; otherwise the
             // preview toolbar can remain disabled or show a stale page number.
-            self.map { pdfView.publishState($0.pageBindings) }
+            self?.publishPageState(in: pdfView)
           }
         }
         .store(in: &publishers)
@@ -166,6 +184,63 @@ extension PDFViewContainer {
 
     private func removePublishers() {
       publishers.removeAll()
+    }
+
+    private func publishPageState(in pdfView: PDFView) {
+      switch bindingPublicationTiming {
+      case .immediate:
+        pdfView.publishState(pageBindings)
+      case .nextMainActorTurn:
+        guard deferredBindingSynchronizationTask == nil else { return }
+        deferredPagePublicationTask?.cancel()
+        deferredPagePublicationTask = Task { @MainActor [weak self, weak pdfView] in
+          await Task.yield()
+          guard
+            !Task.isCancelled,
+            let self,
+            let pdfView,
+            self.pdfView === pdfView
+          else {
+            return
+          }
+          self.deferredPagePublicationTask = nil
+          pdfView.publishState(self.pageBindings)
+        }
+      }
+    }
+
+    private func synchronizeBindings(in pdfView: PDFView) {
+      switch bindingPublicationTiming {
+      case .immediate:
+        pdfView.publishState(pageBindings)
+        refreshSearchBindings(in: pdfView)
+      case .nextMainActorTurn:
+        deferredPagePublicationTask?.cancel()
+        deferredPagePublicationTask = nil
+        deferredBindingSynchronizationTask?.cancel()
+        deferredBindingSynchronizationTask = Task {
+          @MainActor [weak self, weak pdfView] in
+          await Task.yield()
+          guard
+            !Task.isCancelled,
+            let self,
+            let pdfView,
+            self.pdfView === pdfView
+          else {
+            return
+          }
+          self.deferredBindingSynchronizationTask = nil
+          pdfView.publishState(self.pageBindings)
+          self.refreshSearchBindings(in: pdfView)
+        }
+      }
+    }
+
+    private func cancelDeferredBindingPublications() {
+      deferredPagePublicationTask?.cancel()
+      deferredPagePublicationTask = nil
+      deferredBindingSynchronizationTask?.cancel()
+      deferredBindingSynchronizationTask = nil
     }
 
     private func refreshSearchBindings(in pdfView: PDFView) {

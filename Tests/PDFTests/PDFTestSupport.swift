@@ -22,7 +22,8 @@ func bindCoordinator(
   searchResultCountBinding: Binding<Int>? = nil,
   searchOptionsBinding: Binding<NSString.CompareOptions>? = nil,
   searchResultsBinding: Binding<[PDFSearchResult]>? = nil,
-  proxy: PDFViewProxy? = nil
+  proxy: PDFViewProxy? = nil,
+  bindingPublicationTiming: PDFBindingPublicationTiming = .immediate
 ) {
   coordinator.bind(
     view: pdfView,
@@ -39,7 +40,8 @@ func bindCoordinator(
       options: searchOptionsBinding,
       results: searchResultsBinding
     ),
-    proxy: proxy
+    proxy: proxy,
+    bindingPublicationTiming: bindingPublicationTiming
   )
 }
 

@@ -18,6 +18,10 @@
 
     let source: PDFDocument.Representation
 
+    init(source: PDFDocument.Representation) {
+      self.source = source
+    }
+
     private var currentPageNumber: Int {
       pageCount > 0 ? currentPage + 1 : 0
     }

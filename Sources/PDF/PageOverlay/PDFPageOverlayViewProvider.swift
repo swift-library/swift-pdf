@@ -6,10 +6,24 @@ public typealias PDFPageOverlayViewContentProvider = @MainActor (_ page: PDFPage
 
 @MainActor
 extension PDFViewContainer.Coordinator {
-  func configurePageOverlayViewProvider(in pdfView: PDFView) {
-    // Force PDFKit to rewire the overlay provider even when the coordinator instance
-    // is unchanged across document replacement, preview reload, or platform-specific remounts.
-    pdfView.pageOverlayViewProvider = nil
+  func configurePageOverlayViewProvider(
+    in pdfView: PDFView,
+    forceRewire: Bool = false
+  ) {
+    guard pageOverlayViewLifecycle.hasContentProvider else {
+      if pdfView.pageOverlayViewProvider === self {
+        pdfView.pageOverlayViewProvider = nil
+      }
+      return
+    }
+
+    guard forceRewire || pdfView.pageOverlayViewProvider !== self else {
+      return
+    }
+
+    if forceRewire, pdfView.pageOverlayViewProvider === self {
+      pdfView.pageOverlayViewProvider = nil
+    }
     pdfView.pageOverlayViewProvider = self
   }
 }

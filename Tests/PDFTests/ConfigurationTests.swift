@@ -34,5 +34,54 @@ extension PDFTests {
       #expect(pdfView.autoScales == true)
       #expect(pdfView.isInMarkupMode == true)
     }
+
+    @Test
+    func repeatedConfigurationDoesNotRewriteSettledPDFKitProperties() {
+      let pdfView = ConfigurationTrackingPDFView()
+      let configuration = PDFViewConfiguration(
+        displayMode: .twoUpContinuous,
+        displayDirection: .vertical,
+        autoScales: true,
+        isInMarkupMode: true
+      )
+
+      pdfView.configure(using: configuration)
+      let firstWriteCounts = pdfView.writeCounts
+
+      pdfView.configure(using: configuration)
+
+      #expect(firstWriteCounts.displayMode > 0)
+      #expect(firstWriteCounts.autoScales > 0)
+      #expect(firstWriteCounts.isInMarkupMode > 0)
+      #expect(pdfView.writeCounts == firstWriteCounts)
+    }
+  }
+}
+
+@MainActor
+private final class ConfigurationTrackingPDFView: PDFView {
+  struct WriteCounts: Equatable {
+    var displayMode = 0
+    var displayDirection = 0
+    var autoScales = 0
+    var isInMarkupMode = 0
+  }
+
+  private(set) var writeCounts = WriteCounts()
+
+  override var displayMode: PDFDisplayMode {
+    didSet { writeCounts.displayMode += 1 }
+  }
+
+  override var displayDirection: PDFDisplayDirection {
+    didSet { writeCounts.displayDirection += 1 }
+  }
+
+  override var autoScales: Bool {
+    didSet { writeCounts.autoScales += 1 }
+  }
+
+  override var isInMarkupMode: Bool {
+    didSet { writeCounts.isInMarkupMode += 1 }
   }
 }

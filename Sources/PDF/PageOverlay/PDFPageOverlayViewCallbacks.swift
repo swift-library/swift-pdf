@@ -2,12 +2,12 @@ import PDFKit
 
 @MainActor
 struct PDFPageOverlayViewCallbacks {
-  var contentProvider: PDFPageOverlayViewContentProvider
-  var release: PDFPageOverlayViewRelease
+  var contentProvider: PDFPageOverlayViewContentProvider?
+  var release: PDFPageOverlayViewRelease?
 
   init(
-    contentProvider: @escaping PDFPageOverlayViewContentProvider = { _ in nil },
-    release: @escaping PDFPageOverlayViewRelease = { _ in }
+    contentProvider: PDFPageOverlayViewContentProvider? = nil,
+    release: PDFPageOverlayViewRelease? = nil
   ) {
     self.contentProvider = contentProvider
     self.release = release
