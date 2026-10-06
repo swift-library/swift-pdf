@@ -19,7 +19,7 @@ navigation commands through ``PDFViewProxy`` inside ``PDFViewReader``.
 
 - <doc:GettingStarted>
 - <doc:PageOverlays>
-- <doc:Search>
+- <doc:Search-article>
 
 ### Viewers
 
@@ -33,10 +33,10 @@ navigation commands through ``PDFViewProxy`` inside ``PDFViewReader``.
 
 ### Document Sources
 
-- ``PDFKit/PDFDocument/Representation``
-- ``PDFKit/PDFDocument/Representation/document(_:)``
-- ``PDFKit/PDFDocument/Representation/data(_:)``
-- ``PDFKit/PDFDocument/Representation/fileURL(_:)``
+- ``PDFDocument/Representation``
+- ``PDFDocument/Representation/document(_:)``
+- ``PDFDocument/Representation/data(_:)``
+- ``PDFDocument/Representation/fileURL(_:)``
 
 ### Viewer Commands
 
@@ -55,7 +55,7 @@ navigation commands through ``PDFViewProxy`` inside ``PDFViewReader``.
 
 ### Configuration and Settled State
 
-- ``SwiftUICore/View/pdf``
+- ``View/pdf``
 - ``PDFViewBase``
 - ``PDFViewBase/displayMode(_:)``
 - ``PDFViewBase/displayDirection(_:)``
