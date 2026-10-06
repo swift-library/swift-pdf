@@ -45,3 +45,21 @@ struct DocumentReader: View {
 The page, count, and scale bindings publish PDFKit's settled viewer state.
 Use proxy commands to navigate or change scale. An unattached proxy has no
 viewer to receive commands.
+
+## Document input
+
+`PDF(source:)` accepts an existing document, PDF data, or a file URL. PDFKit
+loads data and files. If your interface needs a loading error, create and
+validate a `PDFDocument` before passing it to the viewer.
+
+## Page and scale controls
+
+Use the proxy to go to a page, the first or last page, or a PDFKit selection.
+`goToPage(at:)` clamps an index to the document's page range. Next and previous
+page commands stop at the document's ends. Use `setScaleFactor(_:)`, `zoomIn()`,
+and `zoomOut()` for zoom controls, and observe the resulting scale through
+`.pdf.scaleFactor`.
+
+Configuration modifiers applied to a parent view become defaults for its
+descendant viewers. Bindings and commands belong to a viewer's reader scope;
+use a separate reader for each independently controlled viewer.

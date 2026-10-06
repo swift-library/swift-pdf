@@ -1,65 +1,87 @@
-# PDF
+<p align="center">
+  <img src="Documentation/Assets/Logo.svg" width="160" alt="swift-pdf logo">
+</p>
 
-`PDF` is a Swift Package that provides a SwiftUI-first, library-grade viewer facade over `PDFKit`.
+<h1 align="center">swift-pdf</h1>
 
-Phase-1 focuses on a thin, reusable viewing foundation with clean seams for future interaction, annotation, writer, and processor phases.
+<p align="center">
+  Display, navigate, search, and overlay PDF documents in SwiftUI.
+</p>
 
+<p align="center">
+  <a href="https://github.com/swift-library/swift-pdf/actions/workflows/ci.yml"><img src="https://github.com/swift-library/swift-pdf/actions/workflows/ci.yml/badge.svg?branch=master" alt="CI"></a>
+  <img src="https://img.shields.io/badge/Swift-6.2%2B-F05138" alt="Swift 6.2+">
+  <img src="https://img.shields.io/badge/platforms-iOS%2018%2B%20%7C%20macOS%2015%2B%20%7C%20visionOS%202%2B-lightgrey" alt="Platforms: iOS 18+ | macOS 15+ | visionOS 2+">
+  <a href="LICENSE.txt"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License: Apache-2.0 WITH Swift-exception"></a>
+</p>
 
-## Current boundaries
+[Overview](#overview) · [Install](#install) · [Quick start](#quick-start) ·
+[Usage](#usage) · [Requirements](#requirements) · [Documentation](#documentation) ·
+[Contributing](#contributing) · [License](#license)
 
-- `PDFDocument.Representation`: document loading/input boundary (`PDFDocument`, `Data`, `URL`).
-- `PDFKit`: current fixed viewer backend (no alternate backend abstraction in this phase).
-- `PDFViewReader` + `PDFViewProxy`: command boundary for viewer/session-scoped imperative actions.
-- `.pdf.displayMode(_:)` / `.pdf.displayDirection(_:)` / `.pdf.autoScales(_:)` / `.pdf.isInMarkupMode(_:)`: viewer configuration boundary.
-- `.pdf.currentPage(_:)` + `.pdf.pageCount(_:)` + `.pdf.scaleFactor(_:)`: settled viewer state boundary. These bindings reflect `PDFView`'s actual settled state, not command echo.
-- `.pdf.searchQuery(_:)` + `.pdf.searchResultIndex(_:)` + `.pdf.searchResultCount(_:)` + `.pdf.searchOptions(_:)` + `.pdf.searchResults(_:)`: search input/state boundary, with search options bound as official `NSString.CompareOptions`.
-- `.pdf.overlay(_:)`: per-page SwiftUI overlay hook boundary.
+> [!NOTE]
+> swift-pdf is pre-1.0. Minor releases may include source-breaking changes,
+> so depend on it with `.upToNextMinor(from:)`.
 
-## Installation
+## Overview
 
-Add the package as a local/remote dependency and import:
+swift-pdf brings PDFKit's viewer into SwiftUI through the `PDF` module. Open
+an existing document, PDF data, or a file URL; configure its display through
+`.pdf` modifiers; and connect your own controls through `PDFViewReader`.
+
+- Navigate pages, zoom, and select search results through `PDFViewProxy`.
+- Observe settled page, scale, and search state through SwiftUI bindings.
+- Add SwiftUI content to individual pages with overlay lifecycle callbacks.
+- Use the same viewing API on iOS, macOS, and visionOS.
+
+## Install
+
+Add the package and its `PDF` product to `Package.swift`:
 
 ```swift
-import PDF
+dependencies: [
+  .package(
+    url: "https://github.com/swift-library/swift-pdf.git",
+    .upToNextMinor(from: "0.1.0")
+  ),
+],
+targets: [
+  .target(
+    name: "YourTarget",
+    dependencies: [
+      .product(name: "PDF", package: "swift-pdf"),
+    ]
+  ),
+]
 ```
 
-## Basic usage
+## Quick start
+
+Pass a PDFKit document to the viewer and connect a page control:
 
 ```swift
 import PDF
 import PDFKit
 import SwiftUI
 
-struct ReaderView: View {
+@MainActor
+struct DocumentReader: View {
+  let document: PDFDocument
   @State private var currentPage = 0
   @State private var pageCount = 0
-  @State private var scaleFactor: CGFloat = 1
-  @State private var searchQuery = ""
-  @State private var searchResultIndex: Int? = nil
-  @State private var searchResultCount = 0
-  @State private var searchOptions: NSString.CompareOptions = [.caseInsensitive]
-  @State private var searchResults: [PDFSearchResult] = []
-
-  let source: PDFDocument.Representation
 
   var body: some View {
     PDFViewReader { proxy in
       VStack {
-        PDF(source: source)
+        PDF(document: document)
           .pdf.displayMode(.singlePageContinuous)
-          .pdf.displayDirection(.vertical)
           .pdf.autoScales(true)
           .pdf.currentPage($currentPage)
           .pdf.pageCount($pageCount)
-          .pdf.scaleFactor($scaleFactor)
-          .pdf.searchQuery($searchQuery)
-          .pdf.searchResultIndex($searchResultIndex)
-          .pdf.searchResultCount($searchResultCount)
-          .pdf.searchOptions($searchOptions)
-          .pdf.searchResults($searchResults)
 
-        Button("Next") {
-          proxy.goToNextPage()
+        HStack {
+          Text("Page \(currentPage + 1) of \(pageCount)")
+          Button("Next") { proxy.goToNextPage() }
         }
       }
     }
@@ -67,142 +89,52 @@ struct ReaderView: View {
 }
 ```
 
-For subtree-wide defaults (multiple viewers), you can also use namespace modifiers:
+A reader connects one descendant `PDF` viewer. Page indexes are zero-based.
+Use proxy commands to navigate; page and scale bindings report PDFKit's
+settled state. Writing those output bindings does not navigate the viewer.
 
-```swift
-VStack {
-  PDF(source: sourceA)
-  PDF(source: sourceB)
-}
-.pdf.displayMode(.singlePageContinuous)
-.pdf.displayDirection(.vertical)
-.pdf.autoScales(true)
-```
+## Usage
 
-## Navigation with `PDFViewProxy`
+`PDF(source:)` accepts `.document`, `.data`, or `.fileURL`. Loading is handled
+by PDFKit. Prepare a `PDFDocument` yourself when your interface needs to
+handle a loading error before displaying the viewer.
 
-External controls send commands through `PDFViewProxy`. `PDF` publishes settled state back through `currentPage`, `pageCount`, and `scaleFactor` bindings:
+Use `.pdf.displayDirection`, `.pdf.autoScales`, and `.pdf.isInMarkupMode` to
+configure a viewer. Applying configuration to a parent view supplies defaults
+for its descendant viewers.
 
-```swift
-PDFViewReader { proxy in
-  PDF(source: source)
-    .pdf.currentPage($currentPage)
-    .pdf.pageCount($pageCount)
+Bind `.pdf.searchQuery` and `.pdf.searchOptions` to control a search. Observe
+matches through `.pdf.searchResults`, `.pdf.searchResultCount`, and
+`.pdf.searchResultIndex`; use the proxy to select a result. A query change
+updates matches without automatically navigating.
 
-  Button("First") { proxy.goToFirstPage() }
-  Button("Prev") { proxy.goToPreviousPage() }
-  Button("Next") { proxy.goToNextPage() }
-  Button("Last") { proxy.goToLastPage() }
-}
-```
+Use `.pdf.overlay` to draw SwiftUI content on a page and `.pdf.overlayRelease`
+to release associated resources when its overlay leaves the view lifecycle.
 
-`PDFViewReader` currently supports one descendant `PDF` viewer per reader scope.
+The [getting started](Sources/PDF/PDF.docc/GettingStarted.md),
+[search](Sources/PDF/PDF.docc/Search.md), and
+[page overlay](Sources/PDF/PDF.docc/PageOverlays.md) guides contain complete
+examples and behavior details.
 
-State and command semantics are intentionally split:
+## Requirements
 
-- `PDFViewProxy` sends imperative navigation commands.
-- `currentPage`, `pageCount`, and `scaleFactor` publish settled `PDFView` state.
-- Writing those bindings from the outside is not a navigation API.
+- Swift 6.2 or later.
+- iOS 18+, macOS 15+, or visionOS 2+.
+- SwiftUI and PDFKit; the package has no external package dependencies.
 
-Command/state flow:
+## Documentation
 
-```text
-PDFViewReader -> PDFViewProxy -> PDFView command dispatch
-PDFKit settled page/scale change -> published bindings
-```
+- [PDF module and API index](Sources/PDF/PDF.docc/PDF.md)
+- [PDFViewer example](Examples/PDFViewer)
+- [Versioning and release policy](Documentation/Architecture/VersioningAndRelease.md)
+- [Release guide](Documentation/Reference/ReleaseGuide.md)
 
-Additional currently exported proxy commands:
+## Contributing
 
-- `goToPage(at:)` and `goToSelection(_:)` for explicit page/selection targeting.
-- `setScaleFactor(_:)`, `zoomIn()`, and `zoomOut()` for view-scale control.
+See [Contributing](CONTRIBUTING.md). Run `Scripts/check` for the package's
+formatting, builds, tests, simulator checks, and compiling DocC examples.
 
-## Search state and commands
+## License
 
-Bind query and settled search state directly. Query changes refresh search results, but they do not navigate automatically:
-
-```swift
-TextField("Search", text: $searchQuery)
-
-PDFViewReader { proxy in
-  PDF(source: source)
-    .pdf.searchQuery($searchQuery)
-    .pdf.searchResultIndex($searchResultIndex)
-    .pdf.searchResultCount($searchResultCount)
-    .pdf.searchResults($searchResults)
-
-  Button("Prev") { proxy.goToPreviousSearchResult() }
-  Button("Next") { proxy.goToNextSearchResult() }
-}
-```
-
-Use official Foundation compare options when you need non-default matching behavior:
-
-```swift
-searchOptions = [.caseInsensitive]
-searchOptions = [.caseInsensitive, .diacriticInsensitive]
-searchOptions = []
-```
-
-If `.pdf.searchOptions(_:)` is not bound, search runs with `[]`.
-
-As with page navigation, proxy search commands and published search state are separate:
-
-- `PDFViewProxy.goToSearchResult(at:)` / `goToNextSearchResult()` / `goToPreviousSearchResult()` are commands.
-- `PDFViewProxy.clearSelection()` clears the current viewer selection and focused search-result index without recomputing results.
-- `searchResultIndex`, `searchResultCount`, and `searchResults` are settled state outputs.
-
-## Overlay hooks
-
-Attach a per-page SwiftUI overlay:
-
-```swift
-PDF(source: source)
-  .pdf.overlay { page in
-    Text(page.label ?? "")
-      .font(.caption.monospaced())
-      .padding(8)
-      .background(.blue.opacity(0.75))
-      .foregroundStyle(.white)
-      .clipShape(RoundedRectangle(cornerRadius: 8))
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-  }
-  .pdf.overlayRelease { page in
-    // cleanup for this page
-  }
-```
-
-Overlay behavior is explicit by platform:
-
-- iOS / visionOS / macOS: callbacks are forwarded to `PDFKit` page overlay hooks.
-- `overlayRelease` is lifecycle-based: any overlay view lifecycle removal path triggers release.
-
-## PDFKit function mapping
-
-Detailed current API-to-PDFKit mapping is documented in
-
-## Exported Supporting Types
-
-- `PDFSearchResult`: settled search output model used by `.pdf.searchResults(_:)`.
-- `PDFPageMargins`: exported configuration value type currently available at the package surface, but not yet consumed by the phase-1 modifier surface.
-
-## Preview Fixture Policy
-
-- Preview implementation code lives under `Sources/PDF/Preview` and is compile-gated by `PDF_INTERNAL_PREVIEW`.
-- Shared preview/test fixture lives at `Tests/PDFTests/Fixtures/drawingwithquartz2d.pdf`.
-- Previews resolve fixture files from the repository file system path, not from `Bundle.module`.
-- `PDF` target does not declare `.process` / `.copy` resources for these files, so they are not packaged as SwiftPM target resources.
-- Debug builds define `PDF_INTERNAL_PREVIEW` automatically via `Package.swift`.
-- For custom/non-debug invocations, you can still opt in manually
-  (for example: `swift build -Xswiftc -DPDF_INTERNAL_PREVIEW`).
-
-## Scope notes
-
-- No demo/sample app in this phase.
-- No download/cache/share flows in core.
-- No writer/export/processor implementation yet.
-
-## Repository Policy
-
-- Local commit hook path: `.githooks`
-- Commit policy CI workflow: `.github/workflows/commit-message.yml`
-- Repository type: `swift-package`.
+[Apache-2.0 WITH Swift-exception](LICENSE.txt). See [NOTICE](NOTICE) for
+source ownership and attribution.

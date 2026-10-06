@@ -2,6 +2,11 @@
 
 Display PDF documents in SwiftUI with PDFKit.
 
+@Metadata {
+  @PageImage(purpose: icon, source: "Logo.png", alt: "swift-pdf logo")
+  @PageColor(red)
+}
+
 ## Overview
 
 Create a ``PDF/PDF`` from a document, data, or file URL. Configure a viewer

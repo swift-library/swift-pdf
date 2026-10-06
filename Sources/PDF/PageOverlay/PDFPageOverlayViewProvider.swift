@@ -4,7 +4,9 @@
 import PDFKit
 import SwiftUI
 
+/// Releases resources for a page when its hosted overlay is removed or the viewer is dismantled.
 public typealias PDFPageOverlayViewRelease = @MainActor (_ page: PDFPage) -> Void
+/// Creates or refreshes a page overlay on the main actor; returning `nil` omits that overlay.
 public typealias PDFPageOverlayViewContentProvider = @MainActor (_ page: PDFPage) -> AnyView?
 
 @MainActor

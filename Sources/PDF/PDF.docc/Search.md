@@ -4,7 +4,8 @@ Bind a query and navigate its matching selections.
 
 ## Overview
 
-Query or compare-option changes recompute results. Each ``PDFSearchResult``
+The query is trimmed of leading and trailing whitespace and newlines.
+Changes to the trimmed query or compare options recompute results. Each ``PDFSearchResult``
 contains a result index, a zero-based page index, bounds, and matched text.
 Proxy commands select results and navigate the viewer.
 
@@ -50,4 +51,10 @@ struct SearchableReader: View {
 A query update publishes results without automatically navigating. Search
 options default to `[]` when no options binding is supplied. Clearing the
 selection clears its focused result index while preserving the query and
-results. An empty query clears the result state.
+results. An empty or whitespace-only query clears the result state.
+
+Next and previous result commands cycle through the matches. With no focused
+match, Next selects the first result and Previous selects the last.
+`goToSearchResult(at:)` clamps an index to the available result range.
+Each result describes its selection’s first page, using that page’s coordinate
+space for `bounds`.

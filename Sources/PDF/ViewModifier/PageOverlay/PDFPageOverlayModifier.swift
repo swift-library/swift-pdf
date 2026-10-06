@@ -6,6 +6,8 @@ import SwiftUI
 
 @MainActor
 extension PDFViewBase where Base: View {
+  /// Supplies optional type-erased SwiftUI content for each page on the main actor.
+  /// Returning `nil` removes that page's hosted overlay.
   public func overlay(_ provider: @escaping PDFPageOverlayViewContentProvider) -> some View {
     base.environment(
       \.pageOverlayContentProvider,
@@ -13,6 +15,7 @@ extension PDFViewBase where Base: View {
     )
   }
 
+  /// Builds SwiftUI content for each displayed page, refreshing it with viewer updates.
   public func overlay<Content: View>(
     @ViewBuilder _ content: @escaping (_ page: PDFPage) -> Content
   ) -> some View {
@@ -24,6 +27,8 @@ extension PDFViewBase where Base: View {
     )
   }
 
+  /// Registers main-actor cleanup when a page's overlay leaves its hosting lifecycle.
+  /// Use it to release resources associated with the supplied page.
   public func overlayRelease(_ release: @escaping PDFPageOverlayViewRelease) -> some View {
     base.environment(
       \.pageOverlayRelease,

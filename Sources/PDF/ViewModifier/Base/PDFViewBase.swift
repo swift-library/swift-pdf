@@ -16,6 +16,7 @@ public struct PDFViewBase<Base> {
 extension PDFViewBase: Sendable where Base: Sendable {}
 
 extension View {
+  /// Accesses PDF modifiers that configure descendant viewers through their environment.
   public var pdf: PDFViewBase<Self> {
     .init(self)
   }

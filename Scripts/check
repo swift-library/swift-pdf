@@ -33,7 +33,8 @@ if [ "$RELEASE_CHECK_SCOPE" = all ] || [ "$RELEASE_CHECK_SCOPE" = compiler ]; th
   swift build -c release --force-resolved-versions
   Scripts/check-docs
   ios_destination="$(Scripts/prepare-ci-platforms --test-destination)"
-  export PDF_TEST_RESULT_BUNDLE="$(python3 -c 'import uuid; print(".build/release-validation/ios-tests-" + uuid.uuid4().hex + ".xcresult")')"
+  export PDF_TEST_RESULT_BUNDLE=".build/release-validation/ios-tests.xcresult"
+  rm -rf "$PDF_TEST_RESULT_BUNDLE"
   echo "Testing on $ios_destination"
   xcodebuild test -scheme swift-pdf -destination "$ios_destination" \
     -derivedDataPath .build/xcode/ios -resultBundlePath "$PDF_TEST_RESULT_BUNDLE" \
