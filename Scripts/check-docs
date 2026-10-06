@@ -71,7 +71,8 @@ def main():
     output = root / ".build/release-validation"
     output.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
-        ["swift", "package", "--force-resolved-versions", "dump-symbol-graph", "--skip-synthesized-members"],
+        ["swift", "package", "--force-resolved-versions", "dump-symbol-graph",
+         "--skip-synthesized-members", "--emit-extension-block-symbols"],
         cwd=root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
     )
     (output / "docc-symbolgraph.log").write_text(result.stdout)

@@ -4,7 +4,7 @@ Create a viewer and connect page controls.
 
 ## Overview
 
-Import `PDF`, `PDFKit`, and `SwiftUI`. Use ``PDFDocument/Representation``
+Import `PDF`, `PDFKit`, and `SwiftUI`. Use ``PDFKit/PDFDocument/Representation``
 to choose an existing document, PDF data, or a file URL. Page indexes start at
 zero. A ``PDFViewReader`` connects one descendant viewer to its proxy.
 
