@@ -112,7 +112,7 @@ Use `.pdf.overlay` to draw SwiftUI content on a page and `.pdf.overlayRelease`
 to release associated resources when its overlay leaves the view lifecycle.
 
 The [getting started](Sources/PDF/PDF.docc/GettingStarted.md),
-[search](Sources/PDF/PDF.docc/Search.md), and
+[search](Sources/PDF/PDF.docc/SearchingDocuments.md), and
 [page overlay](Sources/PDF/PDF.docc/PageOverlays.md) guides contain complete
 examples and behavior details.
 

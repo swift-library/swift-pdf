@@ -19,7 +19,7 @@ navigation commands through ``PDFViewProxy`` inside ``PDFViewReader``.
 
 - <doc:GettingStarted>
 - <doc:PageOverlays>
-- <doc:Search>
+- <doc:SearchingDocuments>
 
 ### Viewers
 

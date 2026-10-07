@@ -1,4 +1,4 @@
-# Search
+# Searching Documents
 
 Bind a query and navigate its matching selections.
 
