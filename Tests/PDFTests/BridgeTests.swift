@@ -492,5 +492,52 @@ extension PDFTests {
       #expect(resultCountBox.value == 0)
     }
 
+    @Test
+    func detachingOutgoingCoordinatorPreservesSuccessorProxyCommands() {
+      let document = PDFDocument()
+      let proxy = makeProxy()
+      let outgoingCoordinator = PDFViewContainer.Coordinator()
+      let successorCoordinator = PDFViewContainer.Coordinator()
+      let outgoingView = ZoomTrackingPDFView()
+      let successorView = ZoomTrackingPDFView()
+
+      bindCoordinator(
+        outgoingCoordinator,
+        pdfView: outgoingView,
+        initialSource: .document(document),
+        currentPageBinding: nil,
+        pageCountBinding: nil,
+        proxy: proxy
+      )
+      proxy.zoomIn()
+      #expect(outgoingView.zoomInCallCount == 1)
+
+      bindCoordinator(
+        successorCoordinator,
+        pdfView: successorView,
+        initialSource: .document(document),
+        currentPageBinding: nil,
+        pageCountBinding: nil,
+        proxy: proxy
+      )
+
+      outgoingCoordinator.detach()
+      proxy.zoomIn()
+      #expect(successorView.zoomInCallCount == 1)
+      #expect(outgoingView.zoomInCallCount == 1)
+
+      successorCoordinator.detach()
+      proxy.zoomIn()
+      #expect(successorView.zoomInCallCount == 1)
+    }
+  }
+}
+
+@MainActor
+private final class ZoomTrackingPDFView: PDFView {
+  private(set) var zoomInCallCount = 0
+
+  override func zoomIn(_ sender: Any?) {
+    zoomInCallCount += 1
   }
 }
