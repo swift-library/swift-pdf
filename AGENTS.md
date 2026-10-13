@@ -54,6 +54,8 @@ versions, requirements, dependencies or release workflows.
 
 - Use `README.md` as the package entry point.
 - Use `Package.swift` for package graph, products, targets, and dependencies.
+- Read `Documentation/Architecture/Overview.md`, `ExecutionFlows.md` and
+  `CodingStyle.md` in that directory before changing viewer internals.
 - Keep source changes under `Sources/` and tests under `Tests/`.
 - For GitHub-facing collaboration files, use `.github/` and root governance
   files when present.

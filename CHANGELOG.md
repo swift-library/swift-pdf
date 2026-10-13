@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.1.1
+
+- Preserve a successor viewer’s proxy commands when the outgoing viewer detaches.
+- Publish cached search results and focused index when output bindings are replaced.
+
 ## 0.1.0
 
 - Display PDFKit documents, PDF data, and file URLs in SwiftUI on iOS, macOS, and visionOS.

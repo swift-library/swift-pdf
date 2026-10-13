@@ -334,5 +334,61 @@ extension PDFTests {
       #expect(resultCountBox.value == initialResultCount)
       #expect(searchResultIndexBox.value == initialSearchResultIndex)
     }
+
+    @Test
+    func rebindingSearchOutputsPublishesCachedResultsAndFocusedIndex() async throws {
+      let document = try #require(PDFDocument(url: fixturePDFURL()))
+      let coordinator = PDFViewContainer.Coordinator()
+      let pdfView = NonDispatchingPDFView()
+      let proxy = makeProxy()
+      let queryBox = StringBindingBox("the")
+      let optionsBox = SearchOptionsBindingBox([.caseInsensitive])
+      let indexBox = OptionalIntBindingBox(nil)
+      let countBox = IntBindingBox(0)
+      let resultsBox = SearchResultsBindingBox([])
+
+      bindCoordinator(
+        coordinator,
+        pdfView: pdfView,
+        initialSource: .document(document),
+        currentPageBinding: nil,
+        pageCountBinding: nil,
+        searchQueryBinding: makeBinding(for: queryBox),
+        searchResultIndexBinding: makeBinding(for: indexBox),
+        searchResultCountBinding: makeBinding(for: countBox),
+        searchOptionsBinding: makeBinding(for: optionsBox),
+        searchResultsBinding: makeBinding(for: resultsBox),
+        proxy: proxy
+      )
+      await flushMainActorTasks()
+      #expect(countBox.value > 0)
+
+      proxy.goToSearchResult(at: 0)
+      await flushMainActorTasks()
+      #expect(indexBox.value == 0)
+
+      let replacementIndexBox = OptionalIntBindingBox(nil)
+      let replacementCountBox = IntBindingBox(0)
+      let replacementResultsBox = SearchResultsBindingBox([])
+
+      bindCoordinator(
+        coordinator,
+        pdfView: pdfView,
+        initialSource: .document(document),
+        currentPageBinding: nil,
+        pageCountBinding: nil,
+        searchQueryBinding: makeBinding(for: queryBox),
+        searchResultIndexBinding: makeBinding(for: replacementIndexBox),
+        searchResultCountBinding: makeBinding(for: replacementCountBox),
+        searchOptionsBinding: makeBinding(for: optionsBox),
+        searchResultsBinding: makeBinding(for: replacementResultsBox),
+        proxy: proxy
+      )
+      await flushMainActorTasks()
+
+      #expect(replacementIndexBox.value == 0)
+      #expect(replacementCountBox.value == countBox.value)
+      #expect(replacementResultsBox.value == resultsBox.value)
+    }
   }
 }

@@ -42,7 +42,7 @@ Add the package and its `PDF` product to `Package.swift`:
 dependencies: [
   .package(
     url: "https://github.com/swift-library/swift-pdf.git",
-    .upToNextMinor(from: "0.1.0")
+    .upToNextMinor(from: "0.1.1")
   ),
 ],
 targets: [
@@ -124,6 +124,7 @@ examples and behavior details.
 
 ## Documentation
 
+- [Architecture and lifecycle](Documentation/Architecture/Overview.md)
 - [PDF module and API index](Sources/PDF/PDF.docc/PDF.md)
 - [PDFViewer example](Examples/PDFViewer)
 - [Versioning and release policy](Documentation/Architecture/VersioningAndRelease.md)

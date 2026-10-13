@@ -22,13 +22,20 @@ extension PDFViewContainer {
     private weak var pdfView: PDFView?
     private var proxy: PDFViewProxy? {
       didSet {
-        oldValue?.relay = nil
-        proxy?.relay = relay
+        if oldValue?.relay === relay {
+          oldValue?.relay = nil
+        }
+        if let relay {
+          proxy?.relay = relay
+        }
       }
     }
     private var relay: PDFViewProxyRelay? {
       didSet {
-        proxy?.relay = relay
+        // Only the coordinator that installed the current relay may clear it.
+        if relay != nil || proxy?.relay === oldValue {
+          proxy?.relay = relay
+        }
       }
     }
 
@@ -251,16 +258,12 @@ extension PDFViewContainer {
         return
       }
 
-      guard
-        searchEngine.performFind(
-          query: searchBindings.query?.wrappedValue ?? "",
-          options: searchBindings.options?.wrappedValue ?? []
-        )
-      else {
-        return
+      if searchEngine.performFind(
+        query: searchBindings.query?.wrappedValue ?? "",
+        options: searchBindings.options?.wrappedValue ?? []
+      ) {
+        pdfView.setCurrentSelection(nil, animate: false)
       }
-
-      pdfView.setCurrentSelection(nil, animate: false)
       searchBindingDriver.publish(searchEngine.state, searchBindings: searchBindings)
     }
   }
