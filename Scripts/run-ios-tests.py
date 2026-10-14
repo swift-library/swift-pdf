@@ -13,6 +13,18 @@ import subprocess
 import sys
 
 
+def normalize_sample(text):
+    roots = [(str(Path.cwd()), "<package>"), (str(Path.home()), "<home>")]
+    for name in ("TMPDIR", "RUNNER_TEMP"):
+        if os.environ.get(name):
+            roots.append((os.environ[name].rstrip("/"), "<temporary>"))
+    for source, replacement in sorted(roots, key=lambda pair: len(pair[0]), reverse=True):
+        if len(source) > 1:
+            text = text.replace(source, replacement)
+    # Symbolicated frames can contain the toolchain builder's home directory.
+    return re.sub(r"/(?:Users|home)/[^/\s]+/", "<home>/", text)
+
+
 def capture_stall(bundle, directory):
     sessions = list(bundle.rglob("Session-*.log"))
     if not sessions:
@@ -28,11 +40,18 @@ def capture_stall(bundle, directory):
     if pid <= 1 or Path(command).name != "xctest":
         raise RuntimeError("The recorded test host is no longer available")
     # Sample only the test host identified by this run's fresh result bundle.
-    with (directory / "ios-stall-diagnostics.log").open("w") as output:
-        subprocess.run(
-            ["sample", str(pid), "5", "-file", str(directory / "ios-stall-sample.log")],
-            stdout=output, stderr=subprocess.STDOUT, timeout=20, check=True,
-        )
+    diagnostics = directory / "ios-stall-diagnostics.log"
+    sample = directory / "ios-stall-sample.log"
+    try:
+        with diagnostics.open("w") as output:
+            subprocess.run(
+                ["sample", str(pid), "5", "-file", str(sample)],
+                stdout=output, stderr=subprocess.STDOUT, timeout=20, check=True,
+            )
+    finally:
+        for path in (sample, diagnostics):
+            if path.is_file():
+                path.write_text(normalize_sample(path.read_text()))
 
 
 def terminate(process):

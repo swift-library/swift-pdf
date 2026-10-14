@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 root = Path(__file__).resolve().parents[2]
@@ -34,6 +35,28 @@ class IOSRunnerTests(unittest.TestCase):
         self.assertEqual(result, 7)
         self.assertIn("output", self.log.read_text())
         self.assertIn("diagnostic", self.log.read_text())
+
+    def test_sample_paths_preserve_source_frames_without_home_identities(self):
+        foreign_home = Path("/").joinpath("Users", "compiler-builder")
+        linux_home = Path("/").joinpath("home", "compiler-builder")
+        source = "\n".join([
+            f"frame ({foreign_home}/Sources/Executor.cpp:42)",
+            f"frame ({linux_home}/Sources/Task.cpp:12)",
+            str(Path.cwd() / "Tests/Test.swift"),
+            str(Path.home() / "Library/Test.log"),
+            "/private/test-temporary/session.log",
+            "/usr/lib/libSystem.B.dylib",
+        ])
+        with patch.dict(os.environ, {"TMPDIR": "/private/test-temporary/"}):
+            result = module.normalize_sample(source)
+        self.assertEqual(result.splitlines(), [
+            "frame (<home>/Sources/Executor.cpp:42)",
+            "frame (<home>/Sources/Task.cpp:12)",
+            "<package>/Tests/Test.swift",
+            "<home>/Library/Test.log",
+            "<temporary>/session.log",
+            "/usr/lib/libSystem.B.dylib",
+        ])
 
     def stalled_command(self):
         return [sys.executable, "-c",
