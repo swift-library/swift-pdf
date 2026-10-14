@@ -59,7 +59,7 @@ Add the package and its `PDF` product to `Package.swift`:
 dependencies: [
   .package(
     url: "https://github.com/swift-library/swift-pdf.git",
-    .upToNextMinor(from: "0.1.1")
+    .upToNextMinor(from: "0.1.0")
   ),
 ],
 targets: [
