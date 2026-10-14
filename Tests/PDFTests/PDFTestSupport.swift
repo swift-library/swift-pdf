@@ -214,13 +214,14 @@ func flushMainActorTasks() async {
   await Task.yield()
 }
 
+@MainActor
 func drainRunLoop() {
   RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.01))
 }
 
 @MainActor
 class PDFKitSuite {
-  deinit {
+  isolated deinit {
     drainRunLoop()
   }
 }
