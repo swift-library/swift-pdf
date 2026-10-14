@@ -35,9 +35,7 @@ if [ "$RELEASE_CHECK_SCOPE" = all ] || [ "$RELEASE_CHECK_SCOPE" = compiler ]; th
   export PDF_TEST_RESULT_BUNDLE=".build/release-validation/ios-tests.xcresult"
   rm -rf "$PDF_TEST_RESULT_BUNDLE"
   echo "Testing on $ios_destination"
-  xcodebuild test -scheme swift-pdf -destination "$ios_destination" \
-    -derivedDataPath .build/xcode/ios -resultBundlePath "$PDF_TEST_RESULT_BUNDLE" \
-    > .build/release-validation/ios-tests.log 2>&1
+  python3 Scripts/run-ios-tests.py "$ios_destination" "$PDF_TEST_RESULT_BUNDLE"
   echo 'Building for visionOS Simulator'
   xcodebuild build -scheme swift-pdf -destination 'generic/platform=visionOS Simulator' \
     -derivedDataPath .build/xcode/visionos \
