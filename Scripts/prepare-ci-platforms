@@ -6,6 +6,7 @@
 
 import argparse
 import json
+import os
 from pathlib import Path
 import platform
 import subprocess
@@ -78,13 +79,48 @@ def prepare(name, download=True):
     }
 
 
+def reinitialize_simulator(evidence, output):
+    developer = os.environ.get("DEVELOPER_DIR") or capture("xcode-select", "-p")
+    commands = [
+        (["xcrun", "simctl", "shutdown", evidence["device"]["udid"]], 60),
+        (["sudo", "xcode-select", "-s", developer], 30),
+        (["sudo", "xcodebuild", "-runFirstLaunch"], 120),
+    ]
+    for command, timeout in commands:
+        subprocess.run(command, stdout=output, stderr=subprocess.STDOUT, timeout=timeout, check=True)
+    stopped = subprocess.run(
+        ["pkill", "-TERM", "-x", "com.apple.CoreSimulator.CoreSimulatorService"],
+        stdout=output, stderr=subprocess.STDOUT, timeout=30,
+    )
+    if stopped.returncode not in (0, 1):
+        stopped.check_returncode()
+    subprocess.run(
+        ["xcrun", "simctl", "list", "devices", "--json"],
+        stdout=output, stderr=subprocess.STDOUT, timeout=60, check=True,
+    )
+
+
 def wait_for_boot(evidence, log):
     # A booted device can accept test sessions before its display services are ready.
     command = ["xcrun", "simctl", "bootstatus", evidence["device"]["udid"], "-b"]
     started = time.monotonic()
+    attempts = 1
     with log.open("w") as output:
-        subprocess.run(command, stdout=output, stderr=subprocess.STDOUT, timeout=300, check=True)
-    evidence["boot"] = {"status": "complete", "seconds": time.monotonic() - started}
+        try:
+            subprocess.run(command, stdout=output, stderr=subprocess.STDOUT, timeout=300, check=True)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+            # Host-wide service recovery is safe only on an isolated hosted runner.
+            if not (os.environ.get("GITHUB_ACTIONS") == "true"
+                    and os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted"):
+                raise
+            print("Simulator startup failed: " + str(error), file=output, flush=True)
+            print("Reinitializing the selected Xcode simulator service once.", file=output, flush=True)
+            reinitialize_simulator(evidence, output)
+            attempts = 2
+            subprocess.run(command, stdout=output, stderr=subprocess.STDOUT, timeout=300, check=True)
+    evidence["boot"] = {
+        "status": "complete", "seconds": time.monotonic() - started, "attempts": attempts,
+    }
 
 
 def main():

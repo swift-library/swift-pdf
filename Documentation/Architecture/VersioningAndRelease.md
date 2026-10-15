@@ -23,5 +23,12 @@ PDFViewer example. `Scripts/prepare-ci-platforms` prepares simulator components
 and chooses the installed iOS test destination. Evidence belongs in
 `.build/release-validation`.
 
+Simulator tests start only after the selected device finishes booting. An
+isolated GitHub-hosted runner can reinitialize the selected Xcode's simulator
+service once after a startup failure, then retry booting the same device and
+runtime. Each boot attempt has a five-minute deadline; recovery and a second
+failure propagate. Local and self-hosted machines never reset host-wide
+services. The boot log and attempt count accompany validation evidence.
+
 README owns the package entry point. `Sources/PDF/PDF.docc` owns module
 documentation and compiler-checked usage examples.

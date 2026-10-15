@@ -4,6 +4,7 @@
 import importlib.machinery
 import importlib.util
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -41,6 +42,8 @@ class PlatformTests(unittest.TestCase):
         self.addCleanup(capture.stop)
 
     def capture(self, *command):
+        if command == ("xcode-select", "-p"):
+            return "/Applications/SelectedXcode.app/Contents/Developer"
         if command[:2] == ("xcrun", "--sdk"):
             self.assertIn(command[2], ("xrsimulator", "iphonesimulator"))
             return "26.0"
@@ -153,9 +156,86 @@ class PlatformTests(unittest.TestCase):
                       subprocess.TimeoutExpired(["simctl"], 300)]:
             with self.subTest(error=type(error).__name__), tempfile.TemporaryDirectory(dir=output) as directory:
                 evidence = module.prepare("visionOS", download=False)
-                with patch.object(module.subprocess, "run", side_effect=error):
+                with patch.dict(os.environ, {"GITHUB_ACTIONS": "", "RUNNER_ENVIRONMENT": ""}), \
+                        patch.object(module.subprocess, "run", side_effect=error):
                     with self.assertRaises(type(error)):
                         module.wait_for_boot(evidence, Path(directory) / "boot.log")
+                self.assertNotIn("boot", evidence)
+
+    def test_hosted_recovery_preserves_device_and_toolchain_and_handles_absent_service(self):
+        output = Path(__file__).resolve().parents[2] / ".build/platform-tests"
+        output.mkdir(parents=True, exist_ok=True)
+        environment = {
+            "GITHUB_ACTIONS": "true", "RUNNER_ENVIRONMENT": "github-hosted",
+            "DEVELOPER_DIR": "/Applications/SelectedXcode.app/Contents/Developer",
+        }
+        boot = ["xcrun", "simctl", "bootstatus", "vision-device", "-b"]
+        for service_status in (0, 1):
+            with self.subTest(service_status=service_status), tempfile.TemporaryDirectory(dir=output) as directory:
+                evidence = module.prepare("visionOS", download=False)
+                calls = []
+
+                def run(command, **arguments):
+                    calls.append(command)
+                    self.assertNotIn("boot", evidence)
+                    if len(calls) == 1:
+                        raise subprocess.TimeoutExpired(command, 300)
+                    status = service_status if command[0] == "pkill" else 0
+                    return subprocess.CompletedProcess(command, status)
+
+                with patch.dict(os.environ, environment), patch.object(module.subprocess, "run", side_effect=run):
+                    module.wait_for_boot(evidence, Path(directory) / "boot.log")
+                self.assertEqual(calls, [
+                    boot,
+                    ["xcrun", "simctl", "shutdown", "vision-device"],
+                    ["sudo", "xcode-select", "-s", environment["DEVELOPER_DIR"]],
+                    ["sudo", "xcodebuild", "-runFirstLaunch"],
+                    ["pkill", "-TERM", "-x", "com.apple.CoreSimulator.CoreSimulatorService"],
+                    ["xcrun", "simctl", "list", "devices", "--json"],
+                    boot,
+                ])
+                self.assertEqual(evidence["boot"]["attempts"], 2)
+                self.assertEqual(evidence["boot"]["status"], "complete")
+
+    def test_service_recovery_never_runs_on_local_or_self_hosted_machines(self):
+        output = Path(__file__).resolve().parents[2] / ".build/platform-tests"
+        output.mkdir(parents=True, exist_ok=True)
+        for actions, runner in [("", ""), ("true", "self-hosted"), ("true", ""), ("", "github-hosted")]:
+            with self.subTest(actions=actions, runner=runner), tempfile.TemporaryDirectory(dir=output) as directory:
+                evidence = module.prepare("visionOS", download=False)
+                error = subprocess.TimeoutExpired(["simctl"], 300)
+                with patch.dict(os.environ, {"GITHUB_ACTIONS": actions, "RUNNER_ENVIRONMENT": runner}), \
+                        patch.object(module.subprocess, "run", side_effect=error) as run:
+                    with self.assertRaises(subprocess.TimeoutExpired):
+                        module.wait_for_boot(evidence, Path(directory) / "boot.log")
+                self.assertEqual(run.call_count, 1)
+                self.assertNotIn("boot", evidence)
+
+    def test_recovery_failures_and_second_boot_failure_are_not_retried(self):
+        output = Path(__file__).resolve().parents[2] / ".build/platform-tests"
+        output.mkdir(parents=True, exist_ok=True)
+        environment = {
+            "GITHUB_ACTIONS": "true", "RUNNER_ENVIRONMENT": "github-hosted", "DEVELOPER_DIR": "",
+        }
+        for failing_call in (2, 4, 5, 7):
+            with self.subTest(failing_call=failing_call), tempfile.TemporaryDirectory(dir=output) as directory:
+                evidence = module.prepare("visionOS", download=False)
+                calls = []
+
+                def run(command, **arguments):
+                    calls.append(command)
+                    if len(calls) == 1:
+                        raise subprocess.TimeoutExpired(command, 300)
+                    status = 2 if len(calls) == failing_call else 0
+                    result = subprocess.CompletedProcess(command, status)
+                    if arguments.get("check"):
+                        result.check_returncode()
+                    return result
+
+                with patch.dict(os.environ, environment), patch.object(module.subprocess, "run", side_effect=run):
+                    with self.assertRaises(subprocess.CalledProcessError):
+                        module.wait_for_boot(evidence, Path(directory) / "boot.log")
+                self.assertEqual(len(calls), failing_call)
                 self.assertNotIn("boot", evidence)
 
 
