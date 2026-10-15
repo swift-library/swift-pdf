@@ -10,6 +10,7 @@ from pathlib import Path
 import platform
 import subprocess
 import sys
+import time
 
 
 PLATFORMS = {
@@ -77,16 +78,26 @@ def prepare(name, download=True):
     }
 
 
+def wait_for_boot(evidence, log):
+    # A booted device can accept test sessions before its display services are ready.
+    command = ["xcrun", "simctl", "bootstatus", evidence["device"]["udid"], "-b"]
+    started = time.monotonic()
+    with log.open("w") as output:
+        subprocess.run(command, stdout=output, stderr=subprocess.STDOUT, timeout=300, check=True)
+    evidence["boot"] = {"status": "complete", "seconds": time.monotonic() - started}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--test-destination", action="store_true",
-                        help="Select an installed iOS device and print its destination without downloading")
+                        help="Boot an installed iOS device and print its destination without downloading")
     args = parser.parse_args()
     root = Path(__file__).resolve().parent.parent
     output = root / ".build/release-validation"
     output.mkdir(parents=True, exist_ok=True)
     if args.test_destination:
         evidence = prepare("iOS", download=False)
+        wait_for_boot(evidence, output / "ios-boot.log")
         (output / "ios-test-destination.json").write_text(json.dumps(evidence, indent=2) + "\n")
         print(evidence["destination"])
     else:

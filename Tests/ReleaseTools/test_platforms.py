@@ -5,6 +5,8 @@ import importlib.machinery
 import importlib.util
 import json
 from pathlib import Path
+import subprocess
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -124,6 +126,37 @@ class PlatformTests(unittest.TestCase):
         result = module.prepare("iOS", download=False)
         self.assertEqual(result["sdk"], "iphonesimulator")
         self.assertEqual(result["destination"], "platform=iOS Simulator,id=vision-device")
+
+    def test_boot_readiness_is_recorded_only_after_success(self):
+        output = Path(__file__).resolve().parents[2] / ".build/platform-tests"
+        output.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=output) as directory:
+            evidence = module.prepare("visionOS", download=False)
+
+            def ready(command, **arguments):
+                self.assertNotIn("boot", evidence)
+                self.assertEqual(command, ["xcrun", "simctl", "bootstatus", "vision-device", "-b"])
+                self.assertTrue(arguments["check"])
+                self.assertEqual(arguments["timeout"], 300)
+                arguments["stdout"].write("Finished booting\n")
+
+            log = Path(directory) / "boot.log"
+            with patch.object(module.subprocess, "run", side_effect=ready):
+                module.wait_for_boot(evidence, log)
+            self.assertEqual(evidence["boot"]["status"], "complete")
+            self.assertIn("Finished booting", log.read_text())
+
+    def test_failed_or_stalled_boot_cannot_produce_ready_evidence(self):
+        output = Path(__file__).resolve().parents[2] / ".build/platform-tests"
+        output.mkdir(parents=True, exist_ok=True)
+        for error in [subprocess.CalledProcessError(1, ["simctl"]),
+                      subprocess.TimeoutExpired(["simctl"], 300)]:
+            with self.subTest(error=type(error).__name__), tempfile.TemporaryDirectory(dir=output) as directory:
+                evidence = module.prepare("visionOS", download=False)
+                with patch.object(module.subprocess, "run", side_effect=error):
+                    with self.assertRaises(type(error)):
+                        module.wait_for_boot(evidence, Path(directory) / "boot.log")
+                self.assertNotIn("boot", evidence)
 
 
 if __name__ == "__main__":
