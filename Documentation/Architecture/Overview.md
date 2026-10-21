@@ -60,6 +60,6 @@ thumbnail viewers, asynchronous search and document writing are not additional
 public subsystems of this package.
 
 See [Execution flows](ExecutionFlows.md) for sequencing, [Coding style](CodingStyle.md)
-for implementation guidance, and [Versioning and release](VersioningAndRelease.md)
+for implementation guidance, and [Release](../Reference/Release.md)
 for compatibility requirements. The runnable [PDFViewer example](../../Examples/PDFViewer)
 exercises navigation, search, markup and overlay telemetry with a generated PDF.
