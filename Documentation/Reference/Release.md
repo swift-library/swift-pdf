@@ -16,7 +16,7 @@ documentation and compiler-checked usage examples.
 
 | Shipped component | Version meaning | Version source | Mirrors and derived fields | Update and read-only check |
 | --- | --- | --- | --- | --- |
-| `PDF` library | Library version | [`VERSION`](../../VERSION) | [`CHANGELOG.md`](../../CHANGELOG.md) records release notes. | Not established. |
+| `PDF` library | Library version | [`VERSION`](../../VERSION), named by `version_file` in [`.github/release.json`](../../.github/release.json) | [`CHANGELOG.md`](../../CHANGELOG.md) records release notes. | Not established. |
 
 ## Compatibility Surface
 
@@ -61,7 +61,7 @@ services. The boot log and attempt count accompany validation evidence.
 | Version update and check | Not established. | Not established. |
 | Candidate validation and build | `Scripts/prepare-ci-platforms`; `Scripts/check` | Not established. |
 | Status and interrupted-run recovery | Not established. | Not established. |
-| Acceptance and publication | Not established. | Not established. |
+| Acceptance and publication | Run [`Release`](../../.github/workflows/release.yml) with the accepted tag; it validates the tag and publishes the GitHub release. | Repository write access to run workflows |
 | Cleanup | Not established. | Not established. |
 
 `Scripts/prepare-ci-platforms` prepares simulator components and chooses the
