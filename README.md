@@ -110,8 +110,7 @@ examples and behavior details.
 - [Architecture and lifecycle](Documentation/Architecture/Overview.md)
 - [PDF module and API index](Sources/PDF/PDF.docc/PDF.md)
 - [PDFViewer example](Examples/PDFViewer)
-- [Versioning and release policy](Documentation/Architecture/VersioningAndRelease.md)
-- [Release guide](Documentation/Reference/ReleaseGuide.md)
+- [Release](Documentation/Reference/Release.md): release facts and mechanics; version rules are in VERSIONING.
 
 ## Contributing
 
