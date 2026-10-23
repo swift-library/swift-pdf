@@ -1,7 +1,7 @@
 # Release
 
-Release status: partly manual; `Scripts/check` implements validation, and native
-macOS 27 is an additional release check.
+Release validation and publication use the shared
+[GitHub workflows](https://github.com/swift-library/github-workflows).
 
 Version rules for swift-pdf, covering tags, release timing, choosing the
 next version and the changelog, are in
@@ -10,13 +10,13 @@ This document records the repository's release facts and mechanics and does
 not restate those rules.
 
 README owns the package entry point. `Sources/PDF/PDF.docc` owns module
-documentation and compiler-checked usage examples.
+documentation and usage examples.
 
 ## Components and Version Sources
 
 | Shipped component | Version meaning | Version source | Mirrors and derived fields | Update and read-only check |
 | --- | --- | --- | --- | --- |
-| `PDF` library | Library version | [`VERSION`](../../VERSION), named by `version_file` in [`.github/release.json`](../../.github/release.json) | [`CHANGELOG.md`](../../CHANGELOG.md) records release notes. | Not established. |
+| `PDF` library | Library version | [`VERSION`](../../VERSION), named by `version_file` in [`.github/release.json`](../../.github/release.json) | [`CHANGELOG.md`](../../CHANGELOG.md) records release notes. | Update the declaration and changelog together; the shared policy workflow validates them. |
 
 ## Compatibility Surface
 
@@ -32,37 +32,34 @@ separately. Native macOS 27 is an additional release check.
 
 ## Derived Metadata and Drift Checks
 
-`.github/release.json` selects validation and compiler/platform inputs.
+[`.github/release.json`](../../.github/release.json) declares the repository,
+version source, changelog, minimum Swift version, and supported platform window.
 
-`Scripts/check` checks platform declarations, formatting, platform-tool tests,
-Swift tests, release builds, DocC with warnings treated as errors, compiling
-documentation snippets, iOS simulator tests, visionOS simulator builds and the
-PDFViewer example.
+[`.github/swift-package.json`](../../.github/swift-package.json) declares the
+validation matrix and formatting paths. The shared workflow runs strict
+formatting, Swift tests and release builds on the declared compilers, iOS
+generic builds and simulator tests, a generic visionOS build, and DocC for
+`PDF` with warnings treated as errors. Apple and DocC jobs use the last
+compiler entry's runner and Xcode.
+
+The required checks are `policy / policy` and `validate / result`.
 
 ## Candidate, Acceptance and Publication
 
-Run `Scripts/check` for the accepted source.
-
-## Evidence Reuse and Invalidation
-
-Retain native, platform and consumer evidence for the accepted source.
-
-Simulator tests start only after the selected device finishes booting. An
-isolated GitHub-hosted runner can reinitialize the selected Xcode's simulator
-service once after a startup failure, then retry booting the same device and
-runtime. Each boot attempt has a five-minute deadline; recovery and a second
-failure propagate. Local and self-hosted machines never reset host-wide
-services. The boot log and attempt count accompany validation evidence.
+Run the [local contribution checks](../../CONTRIBUTING.md) for the accepted
+source and require successful shared CI validation. Pushing its signed
+annotated `vX.Y.Z` tag starts the [Release](../../.github/workflows/release.yml)
+workflow. It validates the tagged commit, verifies the tag, version declaration
+and changelog, and publishes the changelog notes as a GitHub release.
 
 ## Entry Points and Artifact Retention
 
 | Operation | Existing command or explicit manual procedure | Required access |
 | --- | --- | --- |
-| Version update and check | Not established. | Not established. |
-| Candidate validation and build | `Scripts/prepare-ci-platforms`; `Scripts/check` | Not established. |
+| Version update and check | Update `VERSION` and `CHANGELOG.md`; the shared policy workflow validates them. | Repository write access |
+| Candidate validation and build | Local checks in `CONTRIBUTING.md`; shared [CI](../../.github/workflows/ci.yml). | Local Swift and Xcode toolchains; GitHub Actions for CI |
 | Status and interrupted-run recovery | Not established. | Not established. |
-| Acceptance and publication | Run [`Release`](../../.github/workflows/release.yml) with the accepted tag; it validates the tag and publishes the GitHub release. | Repository write access to run workflows |
+| Acceptance and publication | Push the accepted signed annotated tag to start [`Release`](../../.github/workflows/release.yml). | Repository write access to push tags |
 | Cleanup | Not established. | Not established. |
 
-`Scripts/prepare-ci-platforms` prepares simulator components and chooses the
-installed iOS test destination. Evidence belongs in `.build/release-validation`.
+Local SwiftPM builds and shared DocC output live under `.build/`.

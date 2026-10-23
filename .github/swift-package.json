@@ -1,0 +1,49 @@
+{
+  "compilers": [
+    {
+      "name": "macos-15-swift-6.2",
+      "runner": "macos-15",
+      "xcode": "26.0.1"
+    },
+    {
+      "name": "macos-26-swift-6.3",
+      "runner": "macos-26",
+      "xcode": "26.6"
+    }
+  ],
+  "format": {
+    "paths": [
+      "Package.swift",
+      "Sources",
+      "Tests",
+      "Examples/PDFViewer/Package.swift",
+      "Examples/PDFViewer/Sources"
+    ]
+  },
+  "platforms": {
+    "apple": [
+      {
+        "name": "ios",
+        "platform": "iOS",
+        "scheme": "swift-pdf",
+        "test": true
+      },
+      {
+        "name": "visionos",
+        "platform": "visionOS",
+        "scheme": "swift-pdf"
+      }
+    ]
+  },
+  "docs": {
+    "targets": [
+      "PDF"
+    ]
+  },
+  "commands": [
+    {
+      "name": "pdfviewer",
+      "run": "swift build --package-path Examples/PDFViewer --force-resolved-versions"
+    }
+  ]
+}
