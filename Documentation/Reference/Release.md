@@ -25,10 +25,11 @@ output bindings, overlay lifecycle and compiler/platform requirements.
 
 ## Dependencies and Verified Combinations
 
-The package requires Swift 6.2, iOS 18, macOS 15 or visionOS 2. The maintained
+The package requires Swift 6.3, iOS 18, macOS 15 or visionOS 2. The maintained
 system window covers iOS 18/26/27, macOS 15/26/27 and visionOS 2/26/27.
-CI tests Swift 6.2 on macOS 15 and Swift 6.3 on macOS 26; strict formatting runs
-separately. Native macOS 27 is an additional release check.
+CI compiles and tests with Xcode 26.6 (Swift 6.3) on macOS 26; strict formatting
+runs separately. The latest SDK checks API availability for older supported
+systems at compile time. Native macOS 27 is an additional release check.
 
 ## Derived Metadata and Drift Checks
 
@@ -36,11 +37,11 @@ separately. Native macOS 27 is an additional release check.
 version source, changelog, minimum Swift version, and supported platform window.
 
 [`.github/swift-package.json`](../../.github/swift-package.json) declares the
-validation matrix and formatting paths. The shared workflow runs strict
-formatting, Swift tests and release builds on the declared compilers, iOS
+CI compiler and formatting paths. The shared workflow runs strict
+formatting, Swift tests and release builds on the declared compiler, iOS
 generic builds and simulator tests, a generic visionOS build, and DocC for
-`PDF` with warnings treated as errors. Apple and DocC jobs use the last
-compiler entry's runner and Xcode.
+`PDF` with warnings treated as errors. Apple and DocC jobs use the declared
+compiler's runner and Xcode.
 
 The required checks are `policy / policy` and `validate / result`.
 

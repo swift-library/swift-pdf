@@ -12,7 +12,7 @@
 
 <p align="center">
   <a href="https://github.com/swift-library/swift-pdf/actions/workflows/ci.yml"><img src="https://github.com/swift-library/swift-pdf/actions/workflows/ci.yml/badge.svg?branch=master" alt="CI"></a>
-  <img src="https://img.shields.io/badge/Swift-6.2%2B-F05138?style=flat" alt="Swift 6.2+">
+  <img src="https://img.shields.io/badge/Swift-6.3%2B-F05138?style=flat" alt="Swift 6.3+">
   <img src="https://img.shields.io/badge/platforms-iOS%2018%2B%20%7C%20macOS%2015%2B%20%7C%20visionOS%202%2B-lightgrey?style=flat" alt="Platforms: iOS 18+ | macOS 15+ | visionOS 2+">
   <a href="LICENSE.txt"><img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat" alt="License: Apache-2.0 WITH Swift-exception"></a>
 </p>
@@ -101,7 +101,7 @@ examples and behavior details.
 
 ## Requirements
 
-- Swift 6.2 or later.
+- Swift 6.3 or later (Xcode 26.6 or later).
 - iOS 18+, macOS 15+, or visionOS 2+.
 - SwiftUI and PDFKit; the package has no external package dependencies.
 
