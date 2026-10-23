@@ -25,4 +25,4 @@ the feature that owns them.
 Keep platform patches narrow and explain the observed native behavior beside
 the adaptation. Preserve common ordering and ownership across platforms. Use
 observable behavior tests, including lifecycle replacement and teardown, and
-run `Scripts/check` before submitting a change.
+run the [contribution checks](../../CONTRIBUTING.md) before submitting a change.

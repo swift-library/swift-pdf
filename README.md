@@ -114,8 +114,7 @@ examples and behavior details.
 
 ## Contributing
 
-See [Contributing](CONTRIBUTING.md). Run `Scripts/check` for the package's
-formatting, builds, tests, simulator checks, and compiling DocC examples.
+See [Contributing](CONTRIBUTING.md) for local build, test, and formatting commands.
 
 ## License
 

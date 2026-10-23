@@ -59,6 +59,10 @@ points.
 - Keep source changes under `Sources/` and tests under `Tests/`.
 - For GitHub-facing collaboration files, use `.github/` and root governance
   files when present.
+- Use `.github/swift-package.json` for CI validation and formatting paths, and
+  `.github/release.json` for release declarations. Required checks are
+  `policy / policy` and `validate / result`. Run the local checks in
+  `CONTRIBUTING.md` before handing off changes.
 
 ## Authority
 
