@@ -39,5 +39,11 @@
     "targets": [
       "PDF"
     ]
-  }
+  },
+  "commands": [
+    {
+      "name": "pdfviewer",
+      "run": "swift build --package-path Examples/PDFViewer --force-resolved-versions"
+    }
+  ]
 }

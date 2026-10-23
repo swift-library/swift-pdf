@@ -13,12 +13,14 @@ Run these checks before opening a pull request:
 swift build
 swift test
 swift build -c release
+swift build --package-path Examples/PDFViewer --force-resolved-versions
 xcrun swift-format lint --strict --configuration .swift-format --recursive \
   Package.swift Sources Tests Examples/PDFViewer/Package.swift Examples/PDFViewer/Sources
 ```
 
 [`.github/swift-package.json`](.github/swift-package.json) declares the compiler
-matrix, formatting paths, iOS tests, visionOS build, and DocC target for CI.
+matrix, formatting paths, iOS tests, visionOS build, DocC target and the
+PDFViewer example build for CI.
 Required checks are `policy / policy` and `validate / result`.
 
 Review the [release facts and mechanics](Documentation/Reference/Release.md)
