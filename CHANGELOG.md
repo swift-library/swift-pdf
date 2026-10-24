@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Breaking**: Require Swift 6.3 or later (Xcode 26.6 or later), with deployment
+  minimums of iOS 18, macOS 15, and visionOS 2.
+
 ## 0.1.1
 
 - Preserve a successor viewer’s proxy commands when the outgoing viewer detaches.

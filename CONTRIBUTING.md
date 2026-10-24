@@ -7,6 +7,9 @@ External contributions are welcome. Use a Conventional Commit PR title and
 follow `.swift-format`. Maintainers follow the shared
 [signing instructions](https://github.com/swift-library/.github/blob/master/MAINTENANCE.md#signing).
 
+Use Swift 6.3 or later locally. Shared CI compiles and tests with Xcode 26.6
+(Swift 6.3) on macOS 26.
+
 Run these checks before opening a pull request:
 
 ```sh
@@ -14,12 +17,12 @@ swift build
 swift test
 swift build -c release
 swift build --package-path Examples/PDFViewer --force-resolved-versions
-xcrun swift-format lint --strict --configuration .swift-format --recursive \
+swift format lint --strict --configuration .swift-format --recursive \
   Package.swift Sources Tests Examples/PDFViewer/Package.swift Examples/PDFViewer/Sources
 ```
 
-[`.github/swift-package.json`](.github/swift-package.json) declares the compiler
-matrix, formatting paths, iOS tests, visionOS build, DocC target and the
+[`.github/swift-package.json`](.github/swift-package.json) declares the single CI
+compiler, formatting paths, iOS tests, visionOS build, DocC target and the
 PDFViewer example build for CI.
 Required checks are `policy / policy` and `validate / result`.
 
